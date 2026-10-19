@@ -2677,7 +2677,9 @@ export const make = Effect.gen(function* () {
   const branchSupersededPullRequest: GitManager["Service"]["branchSupersededPullRequest"] =
     Effect.fn("branchSupersededPullRequest")(function* ({ cwd, branch, pullRequest }) {
       const cacheCwd = yield* normalizeStatusCacheKey(cwd);
-      const saved = yield* Cache.get(savedPullRequestCache, `${cacheCwd}\u0000${pullRequest.url}`);
+      const saved = yield* detachStackFrame(
+        Cache.get(savedPullRequestCache, `${cacheCwd}\u0000${pullRequest.url}`),
+      );
       if (
         saved.state === "open" ||
         saved.number !== pullRequest.number ||
