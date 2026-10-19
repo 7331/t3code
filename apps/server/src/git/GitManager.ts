@@ -143,19 +143,6 @@ export class GitManager extends Context.Service<
       input: { readonly cwd: string; readonly branch: string },
       options?: { readonly refresh?: boolean; readonly freshGitState?: boolean },
     ) => Effect.Effect<GitBranchPullRequest | null, GitManagerServiceError>;
-    /**
-     * Whether this branch has moved past its latest merged or closed PR, which
-     * is why `branchPullRequest` reports nothing for it, and `pullRequest` is
-     * that PR or an older one from the same repository. Link discovery uses it
-     * so it does not restore a reference the branch outgrew. Call it after
-     * `branchPullRequest` for the same branch: a "no" reuses that call's git
-     * reads, and only a "yes" reads git state again.
-     */
-    readonly branchSupersededPullRequest: (input: {
-      readonly cwd: string;
-      readonly branch: string;
-      readonly pullRequest: { readonly number: number; readonly url: string };
-    }) => Effect.Effect<boolean, GitManagerServiceError>;
     readonly invalidateLocalStatus: (cwd: string) => Effect.Effect<void, never>;
     readonly invalidateRemoteStatus: (cwd: string) => Effect.Effect<void, never>;
     readonly invalidateStatus: (cwd: string) => Effect.Effect<void, never>;
@@ -1227,7 +1214,6 @@ export const make = Effect.gen(function* () {
   const getPrLookup = (key: string) => detachStackFrame(Cache.get(prLookupCache, key));
   interface LastKnownPr {
     readonly pr: ReturnType<typeof toStatusPr> | null;
-    readonly headSha: string | null;
     readonly upstreamRef: string | null;
     readonly headBranch: string;
     readonly remoteName: string | null;
@@ -1275,74 +1261,6 @@ export const make = Effect.gen(function* () {
     }
     return lastKnown.pr;
   };
-  // Once one commit is known to descend from another, that never changes. A
-  // "no" is not kept: a shallow clone or a head that was never fetched can
-  // turn into a "yes" after a fetch.
-  const descendsFromByCommits = new Set<string>();
-  /**
-   * A reused branch (like `develop` after a release) has moved past a merged or
-   * closed PR once its tip builds on that PR's head commit. Comparing commits
-   * rather than dates keeps squash and rebase merges working. A tip behind the
-   * head, such as after "Update branch" on the host, has not moved past it.
-   * Unknown when the host reports no head commit, the branch has no local tip,
-   * or the head was never fetched, so the PR stays.
-   */
-  const branchMovedPastPullRequest = (
-    cwd: string,
-    tipOid: string | null,
-    pr: Pick<PullRequestInfo, "state" | "headSha">,
-  ) => {
-    const headSha = pr.headSha?.trim().toLowerCase() ?? "";
-    const tip = tipOid?.trim().toLowerCase() ?? "";
-    if (pr.state === "open" || headSha.length === 0 || tip.length === 0 || tip === headSha) {
-      return Effect.succeed(false);
-    }
-    const key = `${cwd}\u0000${headSha}\u0000${tip}`;
-    if (descendsFromByCommits.has(key)) return Effect.succeed(true);
-    return gitCore
-      .execute({
-        operation: "GitManager.branchMovedPastPullRequest",
-        cwd,
-        args: ["merge-base", "--is-ancestor", headSha, tip],
-        allowNonZeroExit: true,
-        timeoutMs: 5_000,
-      })
-      .pipe(
-        Effect.map((result) => {
-          // 0 is ancestor; 1 is not, and anything else is a failed probe.
-          if (result.exitCode !== 0) return false;
-          if (descendsFromByCommits.size >= PR_LOOKUP_CACHE_CAPACITY) {
-            const oldestKey = descendsFromByCommits.values().next().value;
-            if (oldestKey !== undefined) descendsFromByCommits.delete(oldestKey);
-          }
-          descendsFromByCommits.add(key);
-          return true;
-        }),
-        Effect.orElseSucceed(() => false),
-      );
-  };
-  /**
-   * Status reads the checked-out branch, so HEAD is its tip. Only a terminal
-   * PR with a known head commit costs this read.
-   */
-  const statusMovedPastPullRequest = (
-    cwd: string,
-    pr: Pick<PullRequestInfo, "state" | "headSha">,
-  ) =>
-    pr.state === "open" || !pr.headSha
-      ? Effect.succeed(false)
-      : gitCore
-          .execute({
-            operation: "GitManager.lookupStatusPr.head",
-            cwd,
-            args: ["rev-parse", "--verify", "--quiet", "HEAD"],
-            allowNonZeroExit: true,
-          })
-          .pipe(
-            Effect.map((result) => (result.exitCode === 0 ? result.stdout : null)),
-            Effect.orElseSucceed(() => null),
-            Effect.flatMap((tipOid) => branchMovedPastPullRequest(cwd, tipOid, pr)),
-          );
   const lookupStatusPr = Effect.fn("lookupStatusPr")(function* (
     cwd: string,
     details: {
@@ -1366,24 +1284,18 @@ export const make = Effect.gen(function* () {
       }
     }
     return yield* getPrLookup(cacheKey).pipe(
-      Effect.flatMap(({ latest, headContext }) =>
-        Effect.gen(function* () {
-          if (!latest) return { pr: null, headContext, headSha: null };
-          // Merged/closed matches are usually reverse-merge history, not the thread's PR context.
-          if (details.isDefaultBranch && latest.state !== "open") {
-            return { pr: null, headContext, headSha: null };
-          }
-          if (yield* statusMovedPastPullRequest(cwd, latest)) {
-            return { pr: null, headContext, headSha: null };
-          }
-          return { pr: toStatusPr(latest), headContext, headSha: latest.headSha ?? null };
-        }),
-      ),
-      Effect.tap(({ pr, headContext, headSha }) =>
+      Effect.map(({ latest, headContext }) => {
+        if (!latest) return { pr: null, headContext };
+        // Merged/closed matches are usually reverse-merge history, not the thread's PR context.
+        if (details.isDefaultBranch && latest.state !== "open") {
+          return { pr: null, headContext };
+        }
+        return { pr: toStatusPr(latest), headContext };
+      }),
+      Effect.tap(({ pr, headContext }) =>
         Effect.sync(() =>
           rememberLastKnownPr(branchKey, {
             pr,
-            headSha,
             upstreamRef: details.upstreamRef,
             headBranch: headContext.headBranch,
             remoteName: headContext.remoteName,
@@ -1393,8 +1305,7 @@ export const make = Effect.gen(function* () {
       ),
       Effect.map(({ pr }) => pr),
       Effect.catch((error) => {
-        const lastKnown = lastKnownPrByBranchKey.get(branchKey);
-        const fallback = lastKnown?.pr
+        const fallback = lastKnownPrByBranchKey.get(branchKey)?.pr
           ? resolveLookupHeadContext(cwd, details).pipe(
               Effect.map(({ headContext }) =>
                 resolveLastKnownPr(branchKey, {
@@ -1403,15 +1314,6 @@ export const make = Effect.gen(function* () {
                   remoteName: headContext.remoteName,
                   headRemoteUrlKey: headContext.headRemoteUrlKey,
                 }),
-              ),
-              // The branch may have moved on since this PR was last shown.
-              Effect.flatMap((pr) =>
-                pr === null
-                  ? Effect.succeed(null)
-                  : statusMovedPastPullRequest(cwd, {
-                      state: pr.state,
-                      headSha: lastKnown.headSha ?? undefined,
-                    }).pipe(Effect.map((movedPast) => (movedPast ? null : pr))),
               ),
             )
           : Effect.succeed(null);
@@ -2518,13 +2420,7 @@ export const make = Effect.gen(function* () {
   const lookupBranchPullRequest = Effect.fn("lookupBranchPullRequest")(function* (
     cacheCwd: string,
     branch: string,
-    options: {
-      readonly refresh: boolean;
-      readonly freshGitState: boolean;
-      readonly includeMovedPast?: boolean;
-      /** Also judge merged or closed PRs on the default branch, which `branchPullRequest` never returns. */
-      readonly includeDefaultBranch?: boolean;
-    },
+    options: { readonly refresh: boolean; readonly freshGitState: boolean },
   ) {
     const remember = <E>(key: string, read: Effect.Effect<string | null, E>) =>
       rememberPrLookupGitState(cacheCwd, key, options.freshGitState, read);
@@ -2552,7 +2448,7 @@ export const make = Effect.gen(function* () {
           cwd: cacheCwd,
           args: [
             "for-each-ref",
-            "--format=%(refname)%00%(upstream:short)%00%(upstream:remotename)%00%(upstream:remoteref)%00%(objectname)",
+            "--format=%(refname)%00%(upstream:short)%00%(upstream:remotename)%00%(upstream:remoteref)",
             `refs/heads/${branch}`,
           ],
         })
@@ -2562,13 +2458,8 @@ export const make = Effect.gen(function* () {
     const exactBranch = (branchRef ?? "")
       .split("\n")
       .find((line) => line.split("\u0000", 1)[0] === expectedRefName);
-    const [
-      refName = "",
-      savedUpstream = "",
-      savedRemoteName = "",
-      savedRemoteRef = "",
-      tipOid = "",
-    ] = exactBranch?.split("\u0000") ?? [];
+    const [refName = "", savedUpstream = "", savedRemoteName = "", savedRemoteRef = ""] =
+      exactBranch?.split("\u0000") ?? [];
     const localBranchExists = refName.length > 0;
     let upstreamRef: string | null = null;
     let remoteName: string | null = null;
@@ -2688,12 +2579,14 @@ export const make = Effect.gen(function* () {
     }
     const { latest } = cached;
     if (latest === null) return null;
-    const terminalOnDefaultBranch =
+    if (
       (branch === defaultBranch ||
         (defaultBranch === null && (branch === "main" || branch === "master"))) &&
-      latest.state !== "open";
-    if (terminalOnDefaultBranch && options.includeDefaultBranch !== true) return null;
-    const pullRequest = {
+      latest.state !== "open"
+    ) {
+      return null;
+    }
+    return {
       ...toStatusPr(latest),
       closedAt: latest.closedAt ?? null,
       mergedAt: latest.mergedAt ?? null,
@@ -2702,13 +2595,6 @@ export const make = Effect.gen(function* () {
       // The returned PR URL names the repository that actually owns it.
       repositoryKey: pullRequestRepositoryKey(latest.url),
     };
-    if (yield* branchMovedPastPullRequest(cacheCwd, tipOid, latest)) {
-      return options.includeMovedPast === true
-        ? { ...pullRequest, movedPast: true as const }
-        : null;
-    }
-    if (terminalOnDefaultBranch) return null;
-    return pullRequest;
   });
   const branchPullRequest: GitManager["Service"]["branchPullRequest"] = Effect.fn(
     "branchPullRequest",
@@ -2719,43 +2605,13 @@ export const make = Effect.gen(function* () {
     const pullRequest = yield* lookupBranchPullRequest(cacheCwd, branch, {
       refresh,
       freshGitState,
-      includeMovedPast: true,
     });
-    if (pullRequest === null || pullRequest.state === "open") return pullRequest;
-    if (freshGitState) return "movedPast" in pullRequest ? null : pullRequest;
-    // A terminal answer, including one dropped because the remembered tip had
-    // moved past it, is confirmed against fresh git state: the branch may have
-    // been reset back onto the PR's head since that tip was read.
+    if (pullRequest === null || pullRequest.state === "open" || freshGitState) return pullRequest;
     return yield* lookupBranchPullRequest(cacheCwd, branch, {
       refresh: false,
       freshGitState: true,
     });
   });
-  const branchSupersededPullRequest: GitManager["Service"]["branchSupersededPullRequest"] =
-    Effect.fn("branchSupersededPullRequest")(function* ({ cwd, branch, pullRequest }) {
-      const cacheCwd = yield* normalizeStatusCacheKey(cwd);
-      const supersedes = (freshGitState: boolean) =>
-        lookupBranchPullRequest(cacheCwd, branch, {
-          refresh: false,
-          freshGitState,
-          includeMovedPast: true,
-          includeDefaultBranch: true,
-        }).pipe(
-          // "Latest" means most recently updated, so a comment on an old PR can
-          // make it latest. Numbers only grow within a repository, so a newer
-          // saved PR is not judged by an older one.
-          Effect.map(
-            (latest) =>
-              latest !== null &&
-              "movedPast" in latest &&
-              latest.repositoryKey === pullRequestRepositoryKey(pullRequest.url) &&
-              pullRequest.number <= latest.number,
-          ),
-        );
-      // Clearing a saved reference is final, so a remembered tip that says the
-      // branch moved on is checked against fresh git state first.
-      return (yield* supersedes(false)) && (yield* supersedes(true));
-    });
   const invalidateLocalStatus: GitManager["Service"]["invalidateLocalStatus"] = Effect.fn(
     "invalidateLocalStatus",
   )(function* (cwd) {
@@ -3312,7 +3168,6 @@ export const make = Effect.gen(function* () {
     remoteStatus,
     status,
     branchPullRequest,
-    branchSupersededPullRequest,
     invalidateLocalStatus,
     invalidateRemoteStatus,
     invalidateStatus,
