@@ -4,6 +4,7 @@ import {
   resolveLatestMergeBackRun,
 } from "@t3tools/client-runtime/state/thread-workflows";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowUpFromLineIcon, MoreHorizontalIcon, PenLineIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
@@ -13,7 +14,7 @@ import {
   SIDE_CHAT_EDITABLE_RUNTIME_MODE,
   useSideChatActions,
 } from "../../hooks/useSideChatActions";
-import { useEnvironmentProviders } from "../../state/environments";
+import { serverEnvironment } from "../../state/server";
 import { useThreadProjection, useThreadShell } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { Badge } from "../ui/badge";
@@ -42,20 +43,23 @@ export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: 
   const composerRuntimeMode = useComposerDraftStore(
     (store) => store.getComposerDraft(childRef)?.runtimeMode ?? null,
   );
-  const providers = useEnvironmentProviders().get(props.environmentId);
+  // A provider without auto-accept-edits would fall back to asking, so the
+  // switch must not claim edits are allowed there.
+  const providerInstanceId = shell?.runtime?.providerInstanceId ?? shell?.modelSelection.instanceId;
+  const canAllowEdits = useAtomValue(
+    serverEnvironment.providersValueAtom(props.environmentId),
+    (providers) => {
+      const modes = providers?.find(
+        (provider) => provider.instanceId === providerInstanceId,
+      )?.supportedRuntimeModes;
+      return (
+        modes === undefined || modes.length === 0 || modes.includes(SIDE_CHAT_EDITABLE_RUNTIME_MODE)
+      );
+    },
+  );
 
   if (shell === null) return null;
   const allowEdits = (composerRuntimeMode ?? shell.runtimeMode) !== "approval-required";
-  // A provider without auto-accept-edits would fall back to asking, so the
-  // switch must not claim edits are allowed there.
-  const providerInstanceId = shell.runtime?.providerInstanceId ?? shell.modelSelection.instanceId;
-  const supportedRuntimeModes = providers?.find(
-    (provider) => provider.instanceId === providerInstanceId,
-  )?.supportedRuntimeModes;
-  const canAllowEdits =
-    supportedRuntimeModes === undefined ||
-    supportedRuntimeModes.length === 0 ||
-    supportedRuntimeModes.includes(SIDE_CHAT_EDITABLE_RUNTIME_MODE);
   const mergeRun = childProjection === null ? null : resolveLatestMergeBackRun(childProjection);
   const canBringBack = shell.lineage.relationshipToParent === "fork" && mergeRun !== null;
   const bringBackReason =
@@ -116,7 +120,7 @@ export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: 
         <TooltipPopup side="bottom">
           {canAllowEdits
             ? "Shares the main thread's files. Off, it asks before changing anything."
-            : "This provider asks before every edit."}
+            : "This provider can't approve only edits automatically."}
         </TooltipPopup>
       </Tooltip>
       <Menu>
