@@ -251,8 +251,10 @@ export interface SideChatListingShell {
 
 /**
  * Builds the sidebar and palette test for "list this thread". A side chat stays
- * out while its parent is around to list it; once the parent is deleted, a
- * surviving side chat shows up like an ordinary thread instead of vanishing.
+ * out while its parent is around to list it; once the parent leaves the active
+ * list, a surviving side chat shows up like an ordinary thread instead of
+ * vanishing. Archived and deleted parents both leave that list, so archiving a
+ * parent lists its side chats until it is unarchived.
  */
 export function makeSideChatListingFilter<T extends SideChatListingShell>(
   threads: ReadonlyArray<T>,
