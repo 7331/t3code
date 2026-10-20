@@ -26,6 +26,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { replayAndBufferProjectedLiveEvents } from "./LiveStreamBudget.ts";
 import type { UnsequencedProjectEvent } from "../persistence/OrchestrationEventStore.ts";
 import { projectDomainEventForWire } from "./WireProjection.ts";
+import { makeRunOutcomeRecorder } from "./RunMetrics.ts";
 
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
@@ -238,8 +239,11 @@ const layerBase: Layer.Layer<
           );
         }
       });
+    const recordRunOutcomes = makeRunOutcomeRecorder();
     const publishStoredEvents = (events: ReadonlyArray<OrchestrationV2StoredEvent>) =>
-      eventStore.publishCommitted(events).pipe(Effect.andThen(publishLiveEvents(events)));
+      eventStore
+        .publishCommitted(events)
+        .pipe(Effect.andThen(publishLiveEvents(events)), Effect.andThen(recordRunOutcomes(events)));
 
     // Transactions commit one at a time, but each writer publishes after its
     // commit. If a writer is descheduled in between, a later commit reaches
