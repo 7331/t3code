@@ -3056,23 +3056,13 @@ export default function ChatView(props: ChatViewProps) {
     ) {
       return;
     }
-    rememberReadyThreadTimeline(
-      {
-        threadKey: activeThreadKey,
-        entries: timelineEntries,
-        markdownCwd: gitCwd,
-        workspaceRoot: activeWorkspaceRoot ?? null,
-      },
-      { asLastReady: !embedded },
-    );
-  }, [
-    activeThreadKey,
-    activeWorkspaceRoot,
-    embedded,
-    gitCwd,
-    threadDetailLoading,
-    timelineEntries,
-  ]);
+    rememberReadyThreadTimeline({
+      threadKey: activeThreadKey,
+      entries: timelineEntries,
+      markdownCwd: gitCwd,
+      workspaceRoot: activeWorkspaceRoot ?? null,
+    });
+  }, [activeThreadKey, activeWorkspaceRoot, gitCwd, threadDetailLoading, timelineEntries]);
   const heldPaintContext = paintOnlyDisplayedTimeline
     ? peekHeldThreadTimeline<typeof timelineEntries>()
     : null;

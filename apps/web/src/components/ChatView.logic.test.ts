@@ -1096,16 +1096,6 @@ describe("resolveThreadSwitchTimeline", () => {
     ).toEqual({ entries: [], displayThreadKey: "env-1:thread-b" });
   });
 
-  it("remembers an embedded timeline without making it the one others fall back to", () => {
-    rememberReadyThreadTimeline(held);
-    rememberReadyThreadTimeline(
-      { threadKey: "env-1:side", entries: ["s1"] },
-      { asLastReady: false },
-    );
-    expect(peekHeldThreadTimeline()?.threadKey).toBe("env-1:thread-a");
-    expect(peekRememberedThreadTimeline("env-1:side")).toEqual(["s1"]);
-  });
-
   it("shows the new thread once its detail is ready", () => {
     expect(
       resolveThreadSwitchTimeline({

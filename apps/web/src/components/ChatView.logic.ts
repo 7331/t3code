@@ -333,10 +333,7 @@ let rememberedThreadTimelines = new Map<string, HeldThreadTimeline<readonly unkn
 let rememberedThreadTimelineOrder: string[] = [];
 let lastReadyThreadKey: string | null = null;
 
-function rememberThreadTimelineEntries(
-  held: HeldThreadTimeline<readonly unknown[]>,
-  asLastReady: boolean,
-): void {
+function rememberThreadTimelineEntries(held: HeldThreadTimeline<readonly unknown[]>): void {
   if (held.threadKey === null) {
     return;
   }
@@ -351,21 +348,16 @@ function rememberThreadTimelineEntries(
       rememberedThreadTimelines.delete(evicted);
     }
   }
-  if (asLastReady) lastReadyThreadKey = held.threadKey;
+  lastReadyThreadKey = held.threadKey;
 }
 
-/**
- * `asLastReady: false` remembers the timeline without making it the one other
- * threads show while they load: an embedded side chat is not the route thread.
- */
 export function rememberReadyThreadTimeline<T extends readonly unknown[]>(
   held: HeldThreadTimeline<T>,
-  options: { readonly asLastReady?: boolean } = {},
 ): void {
   if (held.threadKey === null || held.entries.length === 0) {
     return;
   }
-  rememberThreadTimelineEntries(held, options.asLastReady ?? true);
+  rememberThreadTimelineEntries(held);
 }
 
 export function peekRememberedThreadTimeline<T extends readonly unknown[]>(

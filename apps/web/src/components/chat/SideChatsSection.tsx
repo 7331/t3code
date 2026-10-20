@@ -177,7 +177,11 @@ export function SideChatsSection(props: { environmentId: EnvironmentId; threadId
         </p>
       ) : null}
       {active.length > 0 ? (
-        <ul aria-label="Open side chats" className="m-0 list-none p-0">
+        <ul
+          aria-label="Open side chats"
+          className="m-0 list-none p-0"
+          data-thread-details-unmeasured
+        >
           {active.map(renderRow)}
         </ul>
       ) : null}

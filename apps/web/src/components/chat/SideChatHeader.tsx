@@ -9,7 +9,11 @@ import { ArrowUpFromLineIcon, MoreHorizontalIcon, PenLineIcon, Trash2Icon } from
 import { useState } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
-import { useSideChatActions } from "../../hooks/useSideChatActions";
+import {
+  SIDE_CHAT_EDITABLE_RUNTIME_MODE,
+  useSideChatActions,
+} from "../../hooks/useSideChatActions";
+import { useEnvironmentProviders } from "../../state/environments";
 import { useThreadProjection, useThreadShell } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { Badge } from "../ui/badge";
@@ -38,9 +42,20 @@ export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: 
   const composerRuntimeMode = useComposerDraftStore(
     (store) => store.getComposerDraft(childRef)?.runtimeMode ?? null,
   );
+  const providers = useEnvironmentProviders().get(props.environmentId);
 
   if (shell === null) return null;
   const allowEdits = (composerRuntimeMode ?? shell.runtimeMode) !== "approval-required";
+  // A provider without auto-accept-edits would fall back to asking, so the
+  // switch must not claim edits are allowed there.
+  const providerInstanceId = shell.runtime?.providerInstanceId ?? shell.modelSelection.instanceId;
+  const supportedRuntimeModes = providers?.find(
+    (provider) => provider.instanceId === providerInstanceId,
+  )?.supportedRuntimeModes;
+  const canAllowEdits =
+    supportedRuntimeModes === undefined ||
+    supportedRuntimeModes.length === 0 ||
+    supportedRuntimeModes.includes(SIDE_CHAT_EDITABLE_RUNTIME_MODE);
   const mergeRun = childProjection === null ? null : resolveLatestMergeBackRun(childProjection);
   const canBringBack = shell.lineage.relationshipToParent === "fork" && mergeRun !== null;
   const bringBackReason =
@@ -90,7 +105,7 @@ export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: 
               <Switch
                 size="sm"
                 checked={allowEdits}
-                disabled={busy}
+                disabled={busy || (!allowEdits && !canAllowEdits)}
                 onCheckedChange={(checked) =>
                   void run(() => actions.setAllowEdits(props.threadId, checked))
                 }
@@ -99,7 +114,9 @@ export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: 
           }
         />
         <TooltipPopup side="bottom">
-          Shares the main thread's files. Off, it asks before changing anything.
+          {canAllowEdits
+            ? "Shares the main thread's files. Off, it asks before changing anything."
+            : "This provider asks before every edit."}
         </TooltipPopup>
       </Tooltip>
       <Menu>

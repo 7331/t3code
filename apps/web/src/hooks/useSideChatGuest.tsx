@@ -74,8 +74,11 @@ export function useSideChatGuest(input: {
 
   // The parent's own questions stay one Escape away.
   const parentShell = useThreadShell(parentRef);
+  // A delegated child's request is asked on the parent too.
   const parentAwaitingAnswer =
-    parentShell?.hasPendingApprovals === true || parentShell?.hasPendingUserInput === true;
+    parentShell?.hasPendingApprovals === true ||
+    parentShell?.hasPendingUserInput === true ||
+    (parentShell?.pendingSubagentRequest ?? null) !== null;
   const bannerItems = ((): ComposerBannerStackItem[] => {
     if (sideChat === undefined) return composerBannerItems;
     const sideItems: ComposerBannerStackItem[] = [];
