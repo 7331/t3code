@@ -1,4 +1,4 @@
-import type { OrchestrationV2StoredEvent } from "@t3tools/contracts";
+import type { OrchestrationV2Run, OrchestrationV2StoredEvent } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -11,9 +11,16 @@ import {
   runQueueWait,
   runsTotal,
 } from "../observability/Metrics.ts";
-import { isTerminalRunStatus } from "./ThreadManagementService.ts";
 
 const REMEMBERED_RUNS = 4096;
+// How a run can end. `rolled_back` is left out (see below). Declared here rather than taken from
+// ThreadManagementService, which imports back into EventSink.
+const OUTCOMES: ReadonlySet<OrchestrationV2Run["status"]> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
 
 /**
  * Records each run once, when a committed event first shows it finished. A finished run's row is
@@ -30,8 +37,7 @@ export const makeRunOutcomeRecorder = () => {
     for (const { event } of events) {
       if (event.type !== "run.updated") continue;
       const run = event.payload;
-      if (run.status === "rolled_back" || !isTerminalRunStatus(run.status)) continue;
-      if (counted.has(run.id)) continue;
+      if (!OUTCOMES.has(run.status) || counted.has(run.id)) continue;
       counted.add(run.id);
       if (counted.size > REMEMBERED_RUNS) {
         const oldest = counted.values().next();

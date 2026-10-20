@@ -240,10 +240,12 @@ const layerBase: Layer.Layer<
         }
       });
     const recordRunOutcomes = makeRunOutcomeRecorder();
+    // Recorded before publication, so an interrupted publish cannot lose a committed outcome.
     const publishStoredEvents = (events: ReadonlyArray<OrchestrationV2StoredEvent>) =>
-      eventStore
-        .publishCommitted(events)
-        .pipe(Effect.andThen(publishLiveEvents(events)), Effect.andThen(recordRunOutcomes(events)));
+      recordRunOutcomes(events).pipe(
+        Effect.andThen(eventStore.publishCommitted(events)),
+        Effect.andThen(publishLiveEvents(events)),
+      );
 
     // Transactions commit one at a time, but each writer publishes after its
     // commit. If a writer is descheduled in between, a later commit reaches
