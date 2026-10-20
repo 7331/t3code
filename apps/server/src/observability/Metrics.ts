@@ -64,7 +64,7 @@ export const serverEventLoopDelayMax = Metric.gauge("t3_server_event_loop_delay_
 });
 
 export const runsTotal = Metric.counter("t3_runs_total", {
-  description: "Runs that reached a terminal status, by outcome.",
+  description: "Runs that finished, by outcome. A later rollback does not count again.",
 });
 
 export const runDuration = Metric.timer("t3_run_duration", {

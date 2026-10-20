@@ -81,6 +81,27 @@ describe("makeRunOutcomeRecorder", () => {
     }),
   );
 
+  it.effect("does not count a rollback of a run that already finished", () =>
+    Effect.gen(function* () {
+      // A fresh recorder stands in for a restart, which forgets the runs already counted.
+      const record = makeRunOutcomeRecorder();
+      yield* record([
+        runUpdated(
+          1,
+          {
+            id: RunId.make("run:metrics:rolled-back"),
+            status: "rolled_back",
+            startedAt: at("2026-10-19T12:00:30.000Z"),
+            completedAt: at("2026-10-20T09:00:00.000Z"),
+          },
+          "p3",
+        ),
+      ]);
+
+      assert.deepStrictEqual(yield* runSnapshots("p3"), []);
+    }),
+  );
+
   it.effect("counts a run cancelled before it started without timing it", () =>
     Effect.gen(function* () {
       const record = makeRunOutcomeRecorder();

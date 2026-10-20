@@ -18,14 +18,20 @@ const REMEMBERED_RUNS = 4096;
 /**
  * Records each run once, when a committed event first shows it finished. A finished run's row is
  * updated again later (its checkpoint, a settlement), so the runs already counted are remembered.
+ * A rollback is not how a run ended: it rewrites runs that already finished, stamping the rollback
+ * time as their completion, so it would count them again with a duration that runs to the
+ * rollback.
  */
 export const makeRunOutcomeRecorder = () => {
   const counted = new Set<string>();
+  // Untraced: it runs for every committed batch inside the EventSink publish step, whose
+  // operation already owns the span.
   return Effect.fnUntraced(function* (events: ReadonlyArray<OrchestrationV2StoredEvent>) {
     for (const { event } of events) {
       if (event.type !== "run.updated") continue;
       const run = event.payload;
-      if (!isTerminalRunStatus(run.status) || counted.has(run.id)) continue;
+      if (run.status === "rolled_back" || !isTerminalRunStatus(run.status)) continue;
+      if (counted.has(run.id)) continue;
       counted.add(run.id);
       if (counted.size > REMEMBERED_RUNS) {
         const oldest = counted.values().next();
