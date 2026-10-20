@@ -91,6 +91,7 @@ import {
   hasServerAcknowledgedLocalDispatch,
   isBranchMismatchDismissedForSession,
   reconcileMountedTerminalThreadIds,
+  resolveTerminalWorktreePath,
   resolveDraftPromotionNavigationTarget,
   resolveEffectiveInteractionMode,
   resolveThreadMetadataUpdateForNextTurn,
@@ -260,14 +261,14 @@ describe("resolveThreadMetadataUpdateForNextTurn", () => {
     model: "gpt-5.4",
   };
 
-  it("updates a stale local thread branch to the active checkout", () => {
+  it("adopts the checkout branch without clearing the worktree attachment", () => {
     expect(
       resolveThreadMetadataUpdateForNextTurn({
         currentModelSelection: modelSelection,
         currentBranch: "feature/thread",
         nextBranch: "feature/checkout",
       }),
-    ).toEqual({ branch: "feature/checkout", worktreePath: null });
+    ).toEqual({ branch: "feature/checkout" });
   });
 
   it("does not write metadata when the model and branch are unchanged", () => {
@@ -519,6 +520,32 @@ describe("session branch mismatch dismissal", () => {
     expect(isBranchMismatchDismissedForSession("t1:a:b")).toBe(true);
     expect(isBranchMismatchDismissedForSession("t1:a:c")).toBe(false);
     expect(isBranchMismatchDismissedForSession(null)).toBe(false);
+  });
+});
+
+describe("resolveTerminalWorktreePath", () => {
+  it("uses the terminal's checkout identity until neither launch nor session is known", () => {
+    const threadWorktreePath = "/repo/.worktrees/feature";
+
+    expect(
+      resolveTerminalWorktreePath({
+        launchContext: { worktreePath: null },
+        summary: { worktreePath: "/repo/.worktrees/other" },
+        threadWorktreePath,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveTerminalWorktreePath({
+        launchContext: null,
+        summary: { worktreePath: null },
+        threadWorktreePath,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveTerminalWorktreePath({ launchContext: null, summary: null, threadWorktreePath }),
+    ).toBe(threadWorktreePath);
   });
 });
 
@@ -1057,25 +1084,14 @@ describe("resolveThreadSwitchTimeline", () => {
 
   const held = { threadKey: "env-1:thread-a", entries: ["a1", "a2"] };
 
-  it("keeps the previous thread's entries while the next thread is loading", () => {
+  it("leaves an uncached destination empty while its history loads", () => {
+    rememberReadyThreadTimeline(held);
     expect(
       resolveThreadSwitchTimeline({
         loading: true,
         activeThreadKey: "env-1:thread-b",
         nextEntries: [],
         lastReady: held,
-      }),
-    ).toEqual({ entries: ["a1", "a2"], displayThreadKey: "env-1:thread-a" });
-  });
-
-  it("never shows another thread's entries to an embedded side chat while it loads", () => {
-    expect(
-      resolveThreadSwitchTimeline({
-        loading: true,
-        activeThreadKey: "env-1:thread-b",
-        nextEntries: [],
-        lastReady: held,
-        allowOtherThread: false,
       }),
     ).toEqual({ entries: [], displayThreadKey: "env-1:thread-b" });
   });
@@ -1123,18 +1139,6 @@ describe("resolveThreadSwitchTimeline", () => {
       markdownCwd: "/repo/a",
       workspaceRoot: "/repo/a",
     });
-  });
-
-  it("survives a ChatView remount by remembering the last ready timeline", () => {
-    rememberReadyThreadTimeline(held);
-    expect(peekHeldThreadTimeline<string[]>()).toEqual(held);
-    expect(
-      resolveThreadSwitchTimeline({
-        loading: true,
-        activeThreadKey: "env-1:thread-b",
-        nextEntries: [],
-      }),
-    ).toEqual({ entries: ["a1", "a2"], displayThreadKey: "env-1:thread-a" });
   });
 
   it("paints a remembered destination instead of the last-viewed thread", () => {
@@ -1780,7 +1784,6 @@ describe("proactive completed diff guard", () => {
         resolveProactiveTurnDiffAction({
           checkpoint: changedCheckpoint,
           isGitRepo: true,
-          activeSurfaceKind: null,
         }),
       ).toBe(action);
     },
@@ -1800,41 +1803,37 @@ describe("proactive completed diff guard", () => {
       resolveProactiveTurnDiffAction({
         checkpoint: undefined,
         isGitRepo: true,
-        activeSurfaceKind: null,
       }),
     ).toBe("defer");
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: missingCheckpoint,
         isGitRepo: true,
-        activeSurfaceKind: null,
       }),
     ).toBe("defer");
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: changedCheckpoint,
         isGitRepo: undefined,
-        activeSurfaceKind: null,
       }),
     ).toBe("defer");
   });
 
-  it("keeps an active pull request above a completed turn diff", () => {
+  it("delegates a qualifying completed diff to the store while a pull request is active", () => {
     const changedCheckpoint = {
       status: "ready",
-      files: [{ path: "src/app.ts", kind: "modified", additions: 1, deletions: 0 }],
+      files: [{ path: "src/app.ts", kind: "modified", additions: 50, deletions: 0 }],
     } satisfies Pick<TurnDiffSummary, "status" | "files">;
 
     expect(
       resolveProactiveTurnDiffAction({
         checkpoint: changedCheckpoint,
         isGitRepo: true,
-        activeSurfaceKind: "pull-request",
       }),
-    ).toBe("ignore");
+    ).toBe("open");
   });
 
-  it("leaves an already open diff and its chosen scope alone", () => {
+  it("delegates a qualifying completion to the store while a diff is already open", () => {
     const largeCheckpoint = {
       status: "ready",
       files: Array.from({ length: 3 }, (_, index) => ({
@@ -1849,9 +1848,8 @@ describe("proactive completed diff guard", () => {
       resolveProactiveTurnDiffAction({
         checkpoint: largeCheckpoint,
         isGitRepo: true,
-        activeSurfaceKind: "diff",
       }),
-    ).toBe("ignore");
+    ).toBe("open");
   });
 });
 
@@ -1987,6 +1985,12 @@ describe("shouldRefocusComposerOnWindowFocus", () => {
 
   it.each(["IFRAME", "WEBVIEW"])("leaves a focused %s preview alone", (tagName) => {
     expect(shouldRefocusComposerOnWindowFocus(element(tagName))).toBe(false);
+  });
+
+  it("leaves a focused device screen alone", () => {
+    expect(shouldRefocusComposerOnWindowFocus(element("DIV", { within: "application" }))).toBe(
+      false,
+    );
   });
 
   it("leaves a focused terminal alone in the drawer and the right panel", () => {

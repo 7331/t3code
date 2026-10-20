@@ -91,11 +91,10 @@ export function ThreadDetailsCard({
     const measure = () => {
       const frame = element.closest<HTMLElement>("[data-thread-details-card]");
       const next = element.offsetHeight + (frame ? frame.offsetHeight - frame.clientHeight : 0);
-      // Lineage and older side chats grow when expanded. Counting them toward
-      // density would hide the section and workspace controls when the user
-      // asks to see more rows.
+      // PR lists, lineage, and older side chats grow as they expand. Counting them toward
+      // density would hide the section and workspace controls when the user asks to see more rows.
       const expandable = element.querySelectorAll<HTMLElement>(
-        "[data-thread-relationships-panel], [data-thread-details-unmeasured]",
+        "[data-thread-relationships-panel], [data-thread-details-pr-list], [data-thread-details-unmeasured]",
       );
       const fittingHeight =
         next - Array.from(expandable).reduce((total, part) => total + part.offsetHeight, 0);
