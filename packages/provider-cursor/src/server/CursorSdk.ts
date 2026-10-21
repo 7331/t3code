@@ -39,7 +39,7 @@ function isCursorShellSpawnFailure(reason: unknown): boolean {
  * a promise nothing awaits. If that stream has already closed, the write rejects.
  * The SDK's class is minified, so only its `name` identifies it.
  */
-export function isCursorClosedStreamWrite(reason: unknown): boolean {
+function isCursorClosedStreamWrite(reason: unknown): boolean {
   return reason instanceof Error && reason.name === "WriteIterableClosedError";
 }
 

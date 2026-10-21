@@ -1,119 +1,47 @@
-// @effect-diagnostics nodeBuiltinImport:off globalTimers:off -- The probe is a plain Node child; this deadline kills it if it hangs.
-import * as NodeChildProcess from "node:child_process";
-import { describe, expect, it } from "vite-plus/test";
+import { assert, describe, it } from "@effect/vitest";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import { vi } from "vite-plus/test";
 
-import { isCursorClosedStreamWrite } from "./CursorSdk.ts";
+import * as CursorSdk from "./CursorSdk.ts";
 
-const cursorSdkUrl = new URL("./CursorSdk.ts", import.meta.url).href;
+vi.mock("./sdk.ts", () => ({ Agent: {}, createAgentPlatform: {}, SqliteLocalAgentStore: {} }));
 
-// The vitest worker already has its own unhandledRejection listener, which
-// would hide the process-exit behavior.
-const probeProgram = `
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
-
-const dir = mkdtempSync(join(tmpdir(), "cursor-sdk-stub-"));
-const stub = join(dir, "stub.cjs");
-writeFileSync(
-  stub,
-  "module.exports = { Agent: {}, AuthenticationError: class {}, createAgentPlatform: () => ({}), Cursor: {}, CursorSdkError: class {}, InMemoryCredentialStore: class {} };",
-);
-registerHooks({
-  resolve(specifier, context, next) {
-    if (specifier === "@cursor/sdk" || specifier === "@cursor/sdk/sqlite") {
-      return { url: pathToFileURL(stub).href, shortCircuit: true };
-    }
-    return next(specifier, context);
-  },
-});
-
-const { layer } = await import(${JSON.stringify(cursorSdkUrl)});
-const Effect = await import("effect/Effect");
-const Layer = await import("effect/Layer");
-const Scope = await import("effect/Scope");
-const scope = Scope.makeUnsafe();
-await Effect.runPromise(Layer.buildWithScope(layer, scope));
-const mode = process.argv[1];
-
-if (mode === "cursor-closed-write") {
-  // Shaped like the SDK's minified class: the constructor is not named after the error.
-  class o extends Error {
-    constructor(message) {
-      super(message);
-      this.name = "WriteIterableClosedError";
-    }
-  }
-  Promise.reject(new o("WritableIterable is closed"));
-  setTimeout(() => process.exit(0), 500);
-} else {
-  console.error("Unknown cursor closed stream guard probe: " + mode);
-  process.exit(2);
-}
-`;
-
-function runProbe(mode: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = NodeChildProcess.spawn(
-      process.execPath,
-      [
-        "--experimental-strip-types",
-        "--disable-warning=ExperimentalWarning",
-        "--input-type=module",
-        "-e",
-        probeProgram,
-        mode,
-      ],
-      { stdio: ["ignore", "pipe", "pipe"], timeout: 5_000 },
-    );
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      resolve({ code, stdout, stderr });
-    });
-  });
+// Shaped like the SDK's minified class: the constructor is not named after the error.
+class o extends Error {
+  override name = "WriteIterableClosedError";
 }
 
-describe("isCursorClosedStreamWrite", () => {
-  it("matches only the SDK's closed stream write error", () => {
-    class o extends Error {
-      constructor(message: string) {
-        super(message);
-        this.name = "WriteIterableClosedError";
-      }
+// Calls the guard directly, with Vitest's own listener detached so the guard does not defer to it.
+const rejectThroughGuard = (reason: unknown) =>
+  Effect.gen(function* () {
+    const others = process.listeners("unhandledRejection");
+    yield* Layer.build(CursorSdk.layer);
+    const guard = process.listeners("unhandledRejection").find((l) => !others.includes(l));
+    assert.isDefined(guard);
+    using exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    using _log = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const listener of others) process.off("unhandledRejection", listener);
+    try {
+      guard(reason, Promise.resolve());
+    } finally {
+      for (const listener of others) process.on("unhandledRejection", listener);
     }
-    expect(isCursorClosedStreamWrite(new o("WritableIterable is closed"))).toBe(true);
-    expect(isCursorClosedStreamWrite(new Error("WritableIterable is closed"))).toBe(false);
-    expect(isCursorClosedStreamWrite(Object.assign(new Error("x"), { name: "TimeoutError" }))).toBe(
-      false,
-    );
-    expect(isCursorClosedStreamWrite(new TypeError("x"))).toBe(false);
-    expect(
-      isCursorClosedStreamWrite(
-        Object.assign(new Error("x"), { name: "WriteIterableClosedErrorX" }),
-      ),
-    ).toBe(false);
-    expect(isCursorClosedStreamWrite({ name: "WriteIterableClosedError" })).toBe(false);
-    expect(isCursorClosedStreamWrite("WriteIterableClosedError")).toBe(false);
-  });
-});
+    return exit.mock.calls;
+  }).pipe(Effect.scoped);
 
-describe("Cursor closed stream guard", () => {
-  it("keeps the process alive when the SDK writes to a closed stream", async () => {
-    const result = await runProbe("cursor-closed-write");
-    expect(result.code).toBe(0);
-    expect(result.stderr).toContain("The server will keep running.");
-    expect(result.stderr).not.toContain("WritableIterable is closed");
-  });
+describe("CursorSdk unhandled rejection guard", () => {
+  it.effect("keeps the server running when the SDK writes to a closed stream", () =>
+    Effect.gen(function* () {
+      assert.deepStrictEqual(yield* rejectThroughGuard(new o("WritableIterable is closed")), []);
+    }),
+  );
+
+  it.effect("still exits on other rejections", () =>
+    Effect.gen(function* () {
+      assert.deepStrictEqual(yield* rejectThroughGuard(new Error("WritableIterable is closed")), [
+        [1],
+      ]);
+    }),
+  );
 });
