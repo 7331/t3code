@@ -377,6 +377,78 @@ it.layer(
       }),
     );
 
+    it.effect("marks native usage unsupported for a custom proxy without a ChatGPT account", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
+          Effect.succeed(
+            makeCodexProbeSnapshot({
+              account: { account: null, requiresOpenaiAuth: false },
+              rateLimits: { failure: "Codex could not read usage (JSON-RPC -32600)." },
+            }),
+          ),
+        );
+
+        expect(status.status).toBe("ready");
+        expect(status.auth.status).toBe("unknown");
+        expect(status.models.map((model) => model.slug)).toEqual(["gpt-live-codex"]);
+        expect(status.usageLimits).toEqual({
+          checkedAt: status.checkedAt,
+          windows: [],
+          unavailable: { reason: "unsupported" },
+        });
+      }),
+    );
+
+    it.effect("retains native usage failures for ChatGPT subscriptions", () =>
+      Effect.gen(function* () {
+        for (const message of [
+          "Codex could not read usage (JSON-RPC -32600).",
+          "Codex could not read usage (JSON-RPC -32603).",
+        ]) {
+          const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
+            Effect.succeed(makeCodexProbeSnapshot({ rateLimits: { failure: message } })),
+          );
+
+          expect(status.auth.type).toBe("chatgpt");
+          expect(status.usageLimits).toEqual({
+            checkedAt: status.checkedAt,
+            windows: [],
+            unavailable: { reason: "probeFailed", message },
+          });
+        }
+      }),
+    );
+
+    it.effect("retains native usage windows for ChatGPT subscriptions", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
+          Effect.succeed(
+            makeCodexProbeSnapshot({
+              rateLimits: {
+                snapshot: {
+                  primary: { usedPercent: 12, windowDurationMins: 300 },
+                },
+                resetCredits: undefined,
+              },
+            }),
+          ),
+        );
+
+        expect(status.usageLimits).toEqual({
+          checkedAt: status.checkedAt,
+          windows: [
+            {
+              id: "primary",
+              kind: "session",
+              label: "Session",
+              usedPercent: 12,
+              windowDurationMins: 300,
+            },
+          ],
+        });
+      }),
+    );
+
     it.effect("returns unauthenticated when app-server requires OpenAI auth", () =>
       Effect.gen(function* () {
         const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
