@@ -24,6 +24,7 @@ type HomeThreadInput = Pick<
   | "createdAt"
   | "updatedAt"
   | "latestUserMessageAt"
+  | "visibleItemCount"
 >;
 
 export interface HomeThreadSelection<T> {
@@ -32,7 +33,10 @@ export interface HomeThreadSelection<T> {
   readonly threads: ReadonlyArray<T>;
 }
 
-/** Pinned threads in the sidebar's pin order, else the latest thread of each project. */
+/**
+ * Pinned threads in the sidebar's pin order, else the latest thread with messages in each project.
+ * Opening a project leaves an empty thread behind, and it would otherwise win every recent slot.
+ */
 export function selectHomeThreads<T extends HomeThreadInput>(
   threads: ReadonlyArray<T>,
   sortOrder: SidebarThreadSortOrder,
@@ -48,6 +52,7 @@ export function selectHomeThreads<T extends HomeThreadInput>(
   const seenProjects = new Set<string>();
   const recent: T[] = [];
   for (const thread of sortThreads(visible, sortOrder)) {
+    if (thread.visibleItemCount === 0) continue;
     const projectKey = `${thread.environmentId}:${thread.projectId}`;
     if (seenProjects.has(projectKey)) continue;
     seenProjects.add(projectKey);

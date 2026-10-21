@@ -276,8 +276,8 @@ function HomeCardTranscript({
   const messages = latestHomeCardMessages(useThreadVisibleTurnItems(threadRef));
   if (messages.length === 0) {
     return (
-      <p className="px-4 py-3 text-sm text-muted-foreground">
-        {projection === null ? "Loading…" : "No messages yet"}
+      <p className="flex min-h-20 items-center justify-center px-4 py-3 text-sm text-muted-foreground">
+        {projection === null ? "Loading…" : "No messages yet. Send the first one below."}
       </p>
     );
   }

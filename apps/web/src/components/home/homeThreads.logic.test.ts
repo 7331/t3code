@@ -52,15 +52,69 @@ describe("selectHomeThreads", () => {
     const projectA = ProjectId.make("project-a");
     const projectB = ProjectId.make("project-b");
     const threads = [
-      makeThreadFixture({ id: ThreadId.make("a-old"), projectId: projectA, updatedAt: at(1) }),
-      makeThreadFixture({ id: ThreadId.make("a-new"), projectId: projectA, updatedAt: at(5) }),
-      makeThreadFixture({ id: ThreadId.make("b-only"), projectId: projectB, updatedAt: at(3) }),
+      makeThreadFixture({
+        id: ThreadId.make("a-old"),
+        projectId: projectA,
+        updatedAt: at(1),
+        visibleItemCount: 4,
+      }),
+      makeThreadFixture({
+        id: ThreadId.make("a-new"),
+        projectId: projectA,
+        updatedAt: at(5),
+        visibleItemCount: 2,
+      }),
+      makeThreadFixture({
+        id: ThreadId.make("b-only"),
+        projectId: projectB,
+        updatedAt: at(3),
+        visibleItemCount: 1,
+      }),
     ];
 
     const selection = selectHomeThreads(threads, "updated_at");
 
     expect(selection.source).toBe("recent");
     expect(selection.threads.map((thread) => thread.id)).toEqual(["a-new", "b-only"]);
+  });
+
+  it("skips empty threads in the recent fallback, keeping each project's latest with messages", () => {
+    const projectA = ProjectId.make("project-a");
+    const projectB = ProjectId.make("project-b");
+    const threads = [
+      makeThreadFixture({
+        id: ThreadId.make("a-empty"),
+        projectId: projectA,
+        updatedAt: at(9),
+        visibleItemCount: 0,
+      }),
+      makeThreadFixture({
+        id: ThreadId.make("a-talked"),
+        projectId: projectA,
+        updatedAt: at(2),
+        visibleItemCount: 3,
+      }),
+      makeThreadFixture({
+        id: ThreadId.make("b-empty"),
+        projectId: projectB,
+        updatedAt: at(8),
+        visibleItemCount: 0,
+      }),
+    ];
+
+    expect(selectHomeThreads(threads, "updated_at").threads.map((thread) => thread.id)).toEqual([
+      "a-talked",
+    ]);
+  });
+
+  it("still shows an empty thread the user pinned", () => {
+    const pinnedEmpty = makeThreadFixture({
+      id: ThreadId.make("pinned-empty"),
+      pinnedAt: at(1),
+      visibleItemCount: 0,
+    });
+
+    expect(selectHomeThreads([pinnedEmpty], "updated_at").threads).toEqual([pinnedEmpty]);
   });
 
   it("caps the number of cards", () => {
