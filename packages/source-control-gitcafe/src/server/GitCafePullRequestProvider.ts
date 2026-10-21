@@ -400,21 +400,22 @@ export const make = Effect.gen(function* () {
   });
 
   // GitCafe's pulls carry no line totals, and linked pull requests are summarized every minute,
-  // so totals are held per revision rather than recounted from hunks on every read.
-  const lineStatsByRevision = new Map<string, Effect.Success<ReturnType<typeof readLineStats>>>();
+  // so totals are held per head commit rather than recounted from hunks on every read. The
+  // pull's version also moves on comments and reviews, which change no lines.
+  const lineStatsByHead = new Map<string, Effect.Success<ReturnType<typeof readLineStats>>>();
   const lineStats = (
     input: PullRef,
     pull: { readonly version: number; readonly headOid: string },
   ) => {
-    const key = `${input.host} ${input.repository.toLowerCase()} ${input.number} ${pull.version} ${pull.headOid}`;
-    const held = lineStatsByRevision.get(key);
+    const key = `${input.host} ${input.repository.toLowerCase()} ${input.number} ${pull.headOid}`;
+    const held = lineStatsByHead.get(key);
     if (held !== undefined) return Effect.succeed(held);
     return readLineStats(input, pull.version).pipe(
       Effect.tap((stats) =>
         Effect.sync(() => {
-          if (lineStatsByRevision.size >= LINE_STATS_CACHE_SIZE)
-            lineStatsByRevision.delete(lineStatsByRevision.keys().next().value!);
-          lineStatsByRevision.set(key, stats);
+          if (lineStatsByHead.size >= LINE_STATS_CACHE_SIZE)
+            lineStatsByHead.delete(lineStatsByHead.keys().next().value!);
+          lineStatsByHead.set(key, stats);
         }),
       ),
     );
@@ -547,26 +548,6 @@ export const make = Effect.gen(function* () {
         };
       },
     ),
-    listChangeRequestStats: (input) =>
-      Effect.forEach(
-        input.changeRequests,
-        ({ repository, number }) => {
-          const ref = { cwd: input.cwd, host: input.host, repository, number };
-          return readPull("listChangeRequestStats", ref).pipe(
-            Effect.flatMap((pull) =>
-              pull.headOid === null
-                ? Effect.succeed([])
-                : lineStats(ref, { version: pull.version, headOid: pull.headOid }).pipe(
-                    Effect.map(({ additions, deletions }) => [
-                      { repository, number, additions, deletions },
-                    ]),
-                  ),
-            ),
-            Effect.orElseSucceed(() => []),
-          );
-        },
-        { concurrency: 4 },
-      ).pipe(Effect.map((stats) => stats.flat())),
     getChangeRequestSummary: Effect.fn("GitCafePullRequestProvider.getChangeRequestSummary")(
       function* (input) {
         const pull = yield* readPull("getChangeRequestSummary", input);

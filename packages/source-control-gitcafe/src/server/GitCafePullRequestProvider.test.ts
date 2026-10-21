@@ -547,10 +547,12 @@ describe("GitCafePullRequestProvider", () => {
     }).pipe(Effect.provide(server.layer));
   });
 
-  it.effect("summarizes line counts once per revision", () => {
+  it.effect("summarizes line counts once per head commit", () => {
     const snapshot = { version: 4, headOid, comparisonBaseOid: baseOid };
+    let pullReads = 0;
     const server = fakeGitCafe({
-      "GET /repos/owner/repo/pulls/7": pull,
+      // A comment moves the version without moving the head.
+      "GET /repos/owner/repo/pulls/7": () => ({ ...pull, version: 4 + pullReads++ }),
       "GET /repos/owner/repo/pulls/7/changes": {
         ...snapshot,
         items: [{ path: "a.ts" }, { path: "b.ts" }],
@@ -569,16 +571,8 @@ describe("GitCafePullRequestProvider", () => {
       const provider = yield* GitCafePullRequestProvider.make;
       const first = yield* provider.getChangeRequestSummary!(target);
       const second = yield* provider.getChangeRequestSummary!(target);
-      const listed = yield* provider.listChangeRequestStats!({
-        cwd: target.cwd,
-        host: target.host,
-        changeRequests: [{ repository: "owner/repo", number: 7 }],
-      });
       assert.deepInclude(first, { additions: 6, deletions: 2, changedFiles: 2 });
       assert.deepInclude(second, { additions: 6, deletions: 2, changedFiles: 2 });
-      assert.deepStrictEqual(listed, [
-        { repository: "owner/repo", number: 7, additions: 6, deletions: 2 },
-      ]);
       assert.lengthOf(
         server.sent.filter((request) => request.path.endsWith("/changes")),
         1,
