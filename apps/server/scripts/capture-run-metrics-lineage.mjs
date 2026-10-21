@@ -167,8 +167,9 @@ for (const id of ["H-L01", "H-L02", "H-L03", "H-L04"]) {
     } else if (id === "H-L02") {
       yield* stage([stored(child)], { false: 1 }, 1);
       mode = "lineage";
-      yield* stage([stored(child)], { false: 1 }, 1);
-      yield* stage([stored({ ...child, id: "run:new" })], { false: 1, true: 1 }, 2);
+      // The repeat reads lineage again, now delegated, yet keeps its first count and label.
+      yield* stage([stored(child)], { false: 1 }, 2);
+      yield* stage([stored({ ...child, id: "run:new" })], { false: 1, true: 1 }, 3);
     } else if (id === "H-L03") {
       for (const type of ["run.created", "node.updated", "attempt.updated"])
         yield* stage([stored(child, type)], {}, 0);
@@ -178,9 +179,9 @@ for (const id of ["H-L01", "H-L02", "H-L03", "H-L04"]) {
       yield* stage(
         [stored({ ...run, checkpointId: "checkpoint:changed", threadId: "thread:child" })],
         { false: 1 },
-        1,
+        2,
       );
-      yield* stage([stored({ ...child, id: "run:new" })], { false: 1, true: 1 }, 2);
+      yield* stage([stored({ ...child, id: "run:new" })], { false: 1, true: 1 }, 3);
     } else {
       // A lookup defect fails preparation, which rolls back the EventSink transaction, so it
       // reserves nothing and the next commit of the run counts it.
@@ -251,15 +252,18 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
               ),
             );
             const metricsAtLookup = yield* snapshot;
-            // Each earlier lookup in this row counted exactly one run; this one is not yet counted.
+            // Each distinct run looked up earlier in this row was counted once; a repeat of one is
+            // prepared again but not counted again.
+            const runId = uncommittedEvents.at(-1).event.payload.id;
             NodeAssert.equal(
               metricsAtLookup
                 .filter((m) => m.id === "t3_runs_total")
                 .reduce((sum, m) => sum + m.state.count, 0),
-              calls.length,
+              new Set(calls.map((c) => c.runId)).size,
             );
             calls.push({
               threadId: tid,
+              runId,
               inject,
               inTransaction,
               visibleSequence,
@@ -356,7 +360,8 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
         ss = yield* snapshot;
         check(ss, { false: 1 });
         stages.push(ss);
-        NodeAssert.equal(calls.length, count);
+        // The repeat is prepared again, reading lineage, but the recorder already counted it.
+        NodeAssert.equal(calls.length, feature ? count + 1 : 0);
         const fresh = ev("run.updated", { ...r, id: "run:recovered", ordinal: 2 });
         inputs.push([fresh]);
         yield* sink.write({ events: [fresh] });
@@ -364,7 +369,7 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
         check(ss, { false: 1, true: 1 });
         stages.push(ss);
       }
-      NodeAssert.equal(calls.length, feature ? (id === "I07-deleted" ? 1 : 2) : 0);
+      NodeAssert.equal(calls.length, feature ? (id === "I07-deleted" ? 1 : 3) : 0);
       return {
         row: id,
         sha,

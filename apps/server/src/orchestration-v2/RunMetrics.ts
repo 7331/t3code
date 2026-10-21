@@ -53,16 +53,17 @@ export const makeRunOutcomeRecorder = <E>(
 ) => {
   const counted = new Set<string>();
   // Untraced: both run for every committed batch inside the EventSink operation's span.
-  // Leaves `counted` alone, so a transaction that rolls back reserves nothing.
+  // Never reads or writes `counted`, so a transaction that rolls back reserves nothing.
   const prepare = Effect.fnUntraced(function* (events: ReadonlyArray<OrchestrationV2StoredEvent>) {
     const outcomes: Array<RunOutcome> = [];
-    // Repeats in one batch stay in order so `record` applies the same FIFO bound as one event at a
-    // time; only the lineage read is shared.
+    // Every finished run is prepared, in order, even one already counted: an earlier outcome in
+    // this batch may evict it before `record` reaches it, so only `record` decides what counts.
+    // Only the lineage read is shared.
     const delegatedThreads = new Map<ThreadId, boolean>();
     for (const { event } of events) {
       if (event.type !== "run.updated") continue;
       const run = event.payload;
-      if (!OUTCOMES.has(run.status) || counted.has(run.id)) continue;
+      if (!OUTCOMES.has(run.status)) continue;
       let delegated = run.delegatedTaskId !== undefined || delegatedThreads.get(run.threadId);
       if (delegated === undefined) {
         delegated = yield* isSubagentThread(run.threadId).pipe(Effect.orElseSucceed(() => false));

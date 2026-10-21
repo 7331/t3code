@@ -99,7 +99,8 @@ describe("makeRunOutcomeRecorder", () => {
       yield* record([runUpdated(2, "p1", finished)]);
       // Later updates to a finished run, such as its checkpoint, are not another run.
       yield* record([runUpdated(3, "p1", finished)]);
-      assert.deepStrictEqual(lookups, [threadId]);
+      // The repeat reads lineage again in its own batch; only recording deduplicates.
+      assert.deepStrictEqual(lookups, [threadId, threadId]);
 
       const snapshots = yield* runSnapshots("p1");
       const byId = (id: string) => snapshots.find((snapshot) => snapshot.id === id);
@@ -204,6 +205,16 @@ describe("makeRunOutcomeRecorder", () => {
 
       assert.strictEqual(yield* counterValue("p5"), 4098);
       assert.deepStrictEqual(lookups, [threadId]);
+
+      // A run counted in an earlier batch is still prepared, so new runs ahead of it in the same
+      // batch can evict it before it is recorded again.
+      const counted = finished(5000);
+      yield* commitWith(recorder)([counted]);
+      const fresh = Array.from({ length: 4096 }, (_, index) => finished(index + 6000));
+      yield* commitWith(recorder)([...fresh, counted]);
+
+      assert.strictEqual(yield* counterValue("p5"), 4098 + 1 + 4097);
+      assert.deepStrictEqual(lookups, [threadId, threadId, threadId]);
     }),
   );
 });

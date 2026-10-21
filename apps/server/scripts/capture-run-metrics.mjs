@@ -215,6 +215,12 @@ row(
   ],
   [1, 0, 0, 0, 0],
 );
+// A run counted earlier, then repeated after enough new runs in one batch to evict it, counts again.
+row(
+  "D13",
+  [[event("x")], [...Array.from({ length: 4096 }, (_, i) => event("r" + i)), event("x")]],
+  [4098, 4098, 4098 * 30000, 4098, 4098 * 600000],
+);
 const output = [];
 for (const r of rows) {
   const program = Effect.gen(function* () {
