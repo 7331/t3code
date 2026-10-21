@@ -145,25 +145,6 @@ const REPLACE_FILE_COUNTS_CSS = `
 
 const NO_SLICES: ReadonlyArray<DiffSlice> = [];
 
-function sameSlice(slice: DiffSlice, page: DiffSlice) {
-  return (
-    slice.cursor === page.cursor &&
-    slice.patch === page.patch &&
-    slice.truncated === page.truncated &&
-    slice.nextCursor === page.nextCursor &&
-    slice.omittedFileStats.length === page.omittedFileStats.length &&
-    slice.omittedFileStats.every((file, index) => {
-      const refreshed = page.omittedFileStats[index];
-      return (
-        refreshed !== undefined &&
-        refreshed.path === file.path &&
-        refreshed.additions === file.additions &&
-        refreshed.deletions === file.deletions
-      );
-    })
-  );
-}
-
 // Each slice is parsed once per cache key and the parse lives as long as the slice does, so a
 // slice arriving costs one parse rather than one per slice already on screen.
 const sliceParses = new WeakMap<DiffSlice, Map<string, RenderablePatch | null>>();
@@ -357,31 +338,55 @@ function PullRequestCodeTab({
     }),
   );
   // Pages accumulate into slices as each answer arrives, so the slice list is adjusted while
-  // rendering the answer rather than one commit later. Whether an answer is in is read from the
-  // slices: an equal refetch keeps the answer's identity, so it cannot signal a reset's refill.
+  // rendering the answer rather than one commit later.
+  const [appliedPage, setAppliedPage] = useState<{
+    readonly data: typeof diffQuery.data;
+    readonly cursor: string | null;
+    readonly scopeKey: string;
+  } | null>(null);
   const data = diffQuery.data;
-  const page: DiffSlice | null =
-    data === null
-      ? null
-      : {
-          cursor,
-          patch: data.patch,
-          truncated: data.truncated,
-          nextCursor: data.nextCursor,
-          omittedFileStats: data.omittedFileStats ?? [],
-        };
-  if (page !== null && !loadedSlices.some((slice) => sameSlice(slice, page))) {
+  if (
+    data !== null &&
+    (appliedPage?.data !== data ||
+      appliedPage.cursor !== cursor ||
+      appliedPage.scopeKey !== scopeKey)
+  ) {
+    setAppliedPage({ data, cursor, scopeKey });
     setSliceState((previous) => {
       const slices = previous.key === scopeKey ? previous.slices : NO_SLICES;
+      const next = {
+        cursor,
+        patch: data.patch,
+        truncated: data.truncated,
+        nextCursor: data.nextCursor,
+        omittedFileStats: data.omittedFileStats ?? [],
+      };
       const index = slices.findIndex((slice) => slice.cursor === cursor);
       if (index === -1) {
-        return { key: scopeKey, cursor, slices: [...slices, page] };
+        return { key: scopeKey, cursor, slices: [...slices, next] };
       }
       const existing = slices[index];
-      if (existing !== undefined && sameSlice(existing, page)) return previous;
+      if (
+        existing !== undefined &&
+        existing.patch === next.patch &&
+        existing.truncated === next.truncated &&
+        existing.nextCursor === next.nextCursor &&
+        existing.omittedFileStats.length === next.omittedFileStats.length &&
+        existing.omittedFileStats.every((file, index) => {
+          const refreshed = next.omittedFileStats[index];
+          return (
+            refreshed !== undefined &&
+            refreshed.path === file.path &&
+            refreshed.additions === file.additions &&
+            refreshed.deletions === file.deletions
+          );
+        })
+      ) {
+        return previous;
+      }
       // A page that came back different means the diff moved under the review. The slices
       // after it go with the replacement: their cursors were positions in the old diff.
-      return { key: scopeKey, cursor, slices: [...slices.slice(0, index), page] };
+      return { key: scopeKey, cursor, slices: [...slices.slice(0, index), next] };
     });
   }
   const refreshFirstDiffPage = useAtomRefresh(
@@ -426,6 +431,9 @@ function PullRequestCodeTab({
     if (appliedRefreshToken.current === refreshToken) return;
     appliedRefreshToken.current = refreshToken;
     setSliceState({ key: scopeKey, cursor: null, slices: NO_SLICES });
+    // An equal refetch keeps the answer's identity, so the emptied slices refill only if the
+    // applied page is forgotten too.
+    setAppliedPage(null);
     refreshFirstDiffPage();
     refreshFilesViewed();
   }, [refreshToken, scopeKey, refreshFirstDiffPage, refreshFilesViewed]);

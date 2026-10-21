@@ -5,10 +5,7 @@ import {
   type PullRequestDetailView,
   type PullRequestDiffResult,
 } from "@t3tools/contracts";
-import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
-import { page } from "vite-plus/test/browser";
+import { expect, it, vi } from "vite-plus/test";
 
 import "~/index.css";
 
@@ -48,6 +45,7 @@ vi.mock(import("~/state/pullRequests"), async (original) => {
   };
 });
 
+import { render } from "../../../test/render";
 import PullRequestCodeTab from "./PullRequestCodeTab";
 
 const detail: PullRequestDetailView = {
@@ -102,46 +100,29 @@ const detail: PullRequestDetailView = {
   },
 };
 
-let root: Root;
-let container: HTMLDivElement;
-beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  container = document.createElement("div");
-  container.className = "flex h-[700px] w-[900px]";
-  document.body.append(container);
-  root = createRoot(container);
-});
-afterEach(async () => {
-  await act(async () => root.unmount());
-  container.remove();
-  localStorage.clear();
-  vi.unstubAllGlobals();
-});
-
-const render = (refreshToken: number) =>
-  act(async () =>
-    root.render(
-      <PullRequestCodeTab
-        scrollerRef={() => {}}
-        environmentId={EnvironmentId.make("environment")}
-        reference={detail}
-        detail={detail}
-        selectedCommitOid={null}
-        onSelectedCommitChange={() => {}}
-        onRefresh={() => {}}
-        refreshToken={refreshToken}
-      />,
-    ),
-  );
+const tab = (refreshToken: number) => (
+  <PullRequestCodeTab
+    scrollerRef={() => {}}
+    environmentId={EnvironmentId.make("environment")}
+    reference={detail}
+    detail={detail}
+    selectedCommitOid={null}
+    onSelectedCommitChange={() => {}}
+    onRefresh={() => {}}
+    refreshToken={refreshToken}
+  />
+);
 
 it("keeps the diff after a refresh that brings back the same page", async () => {
-  await render(0);
-  await expect.element(page.getByText("1 file", { exact: true })).toBeVisible();
+  const container = document.createElement("div");
+  container.className = "flex h-[700px] w-[900px]";
+  await using screen = await render(tab(0), { container });
+  await expect.element(screen.getByText("1 file", { exact: true })).toBeVisible();
 
-  await render(1);
+  await screen.rerender(tab(1));
 
   await expect
-    .element(page.getByText("This pull request has no file changes."))
+    .element(screen.getByText("This pull request has no file changes."))
     .not.toBeInTheDocument();
-  await expect.element(page.getByText("1 file", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 file", { exact: true })).toBeVisible();
 });
