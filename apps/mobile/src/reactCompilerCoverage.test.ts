@@ -123,8 +123,8 @@ function walkAst(
   for (const child of Object.values(value)) walkAst(child, visit, childAncestors);
 }
 
-// For each call to `callee`, whether it runs inside an `if ($[n] !== dep)`
-// cache block rather than on every render.
+// For each call to `callee`, whether it runs only on the cache-miss branch of
+// an `if ($[n] !== dep)` block rather than on every render.
 function compilerCachedCalls(file: string, callee: string): boolean[] {
   const result = compileLikeMetro(file, [], { ast: true });
   const cached: boolean[] = [];
@@ -134,8 +134,10 @@ function compilerCachedCalls(file: string, callee: string): boolean[] {
     if (node.callee.type !== "Identifier" || node.callee.name !== callee) return;
     cached.push(
       ancestors.some(
-        (ancestor) =>
-          ancestor.type === "IfStatement" && JSON.stringify(ancestor.test).includes('"name":"$"'),
+        (ancestor, index) =>
+          ancestor.type === "IfStatement" &&
+          ancestors[index + 1] === ancestor.consequent &&
+          JSON.stringify(ancestor.test).includes('"name":"$"'),
       ),
     );
   });
