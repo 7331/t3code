@@ -91,3 +91,19 @@ export function homeCardSpansFullWidth(index: number, count: number): boolean {
   if (index === 0) return true;
   return index === count - 1 && (count - 1) % 2 === 1;
 }
+
+/**
+ * Pin and settle act on sidebar rows, and subagent threads have no row: the provider or parent
+ * owns them. Cards offer the actions only for top-level threads whose environment supports them.
+ */
+export function homeCardThreadActions(input: {
+  readonly thread: Pick<EnvironmentThreadShell, "lineage">;
+  readonly supportsPinning: boolean;
+  readonly supportsSettlement: boolean;
+}): { readonly pin: boolean; readonly settle: boolean } {
+  const topLevel = input.thread.lineage.relationshipToParent !== "subagent";
+  return {
+    pin: topLevel && input.supportsPinning,
+    settle: topLevel && input.supportsSettlement,
+  };
+}

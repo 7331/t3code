@@ -39,7 +39,6 @@ import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { ComposerCommandMenu, composerSuggestionOptionId } from "../chat/ComposerCommandMenu";
 import { ComposerCommandMenuLayer } from "../chat/ComposerCommandMenuLayer";
 import { ComposerSendButton } from "../chat/ComposerSendButton";
-import { ComposerSurface } from "../chat/ComposerSurface";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { useComposerMenuItems } from "../chat/useComposerMenuItems";
 import { useComposerTriggerState } from "../chat/useComposerTriggerState";
@@ -221,79 +220,81 @@ export function HomeCardComposer({
   };
 
   return (
-    <div className="border-t px-3 pt-3 pb-3">
-      <ComposerSurface.Shell>
-        <ComposerSurface.Host ref={setAnchor}>
-          <div className="relative z-10 flex flex-col gap-1 px-1 pt-1 pb-1">
-            <ComposerPromptEditor
-              draftKey={`home-card:${thread.environmentId}:${thread.id}`}
-              ariaLabel={`Reply to ${thread.title}`}
-              editorRef={editorRef}
-              value={prompt}
-              cursor={cursor}
-              contextRecords={EMPTY_COMPOSER_CONTEXT_RECORDS}
-              skills={skills}
+    // The card's own reply surface: inset like the messages above, one border, no shadow, and the
+    // thread composer's padding and radius scaled to a card. The menu layer reads the drawer inset.
+    <div className="px-4 pb-4">
+      <div
+        ref={setAnchor}
+        className="flex flex-col gap-2 rounded-2xl border border-input bg-background px-3 py-3 [--chat-composer-drawer-inset:0rem]"
+      >
+        <ComposerPromptEditor
+          draftKey={`home-card:${thread.environmentId}:${thread.id}`}
+          ariaLabel={`Reply to ${thread.title}`}
+          editorRef={editorRef}
+          value={prompt}
+          cursor={cursor}
+          contextRecords={EMPTY_COMPOSER_CONTEXT_RECORDS}
+          skills={skills}
+          disabled={!canOperate}
+          placeholder={
+            canOperate ? `Reply to ${thread.title}` : "This connection can't send messages"
+          }
+          suggestionListId={listId}
+          activeSuggestionId={
+            trigger !== null && activeItem !== null
+              ? composerSuggestionOptionId(listId, activeItem.id)
+              : undefined
+          }
+          className="max-h-40 min-h-6"
+          onChange={(nextValue, nextCursor, expandedCursor, cursorAdjacentToMention) => {
+            setPrompt(threadRef, nextValue);
+            setCursor(nextCursor);
+            setTrigger(
+              cursorAdjacentToMention
+                ? null
+                : cardTrigger(detectComposerTrigger(nextValue, expandedCursor)),
+            );
+          }}
+          onCommandKeyDown={onCommandKeyDown}
+          onPaste={() => undefined}
+        />
+        {/* The picker's own padding is pulled into the gutter so its icon lines up with the text. */}
+        <div className="-ms-2.5 flex min-w-0 items-center gap-2">
+          {entry !== null ? (
+            <ProviderModelPicker
+              environmentId={thread.environmentId}
+              activeInstanceId={instanceId}
+              model={shownModel}
+              lockedProvider={entry.driverKind}
+              instanceEntries={[entry]}
+              modelOptionsByInstance={modelOptions}
+              isComposerOwned
               disabled={!canOperate}
-              placeholder={
-                canOperate ? `Reply to ${thread.title}` : "This connection can't send messages"
+              onInstanceModelChange={(nextInstanceId, model) =>
+                setModelSelection(threadRef, createModelSelection(nextInstanceId, model), {
+                  explicit: true,
+                })
               }
-              suggestionListId={listId}
-              activeSuggestionId={
-                trigger !== null && activeItem !== null
-                  ? composerSuggestionOptionId(listId, activeItem.id)
-                  : undefined
-              }
-              className="max-h-40 min-h-6 px-3 pt-2"
-              onChange={(nextValue, nextCursor, expandedCursor, cursorAdjacentToMention) => {
-                setPrompt(threadRef, nextValue);
-                setCursor(nextCursor);
-                setTrigger(
-                  cursorAdjacentToMention
-                    ? null
-                    : cardTrigger(detectComposerTrigger(nextValue, expandedCursor)),
-                );
-              }}
-              onCommandKeyDown={onCommandKeyDown}
-              onPaste={() => undefined}
             />
-            <div className="flex items-center gap-2 ps-1">
-              {entry !== null ? (
-                <ProviderModelPicker
-                  environmentId={thread.environmentId}
-                  activeInstanceId={instanceId}
-                  model={shownModel}
-                  lockedProvider={entry.driverKind}
-                  instanceEntries={[entry]}
-                  modelOptionsByInstance={modelOptions}
-                  compact
-                  disabled={!canOperate}
-                  onInstanceModelChange={(nextInstanceId, model) =>
-                    setModelSelection(threadRef, createModelSelection(nextInstanceId, model), {
-                      explicit: true,
-                    })
-                  }
-                />
-              ) : (
-                <span className="truncate px-2 text-xs text-muted-foreground">{shownModel}</span>
-              )}
-              {draftHasExtras ? (
-                <span className="truncate text-xs text-muted-foreground">
-                  Has attachments · send from the thread
-                </span>
-              ) : null}
-              <ComposerSendButton
-                aria-label="Send"
-                className="ms-auto"
-                disabled={!canSend}
-                onClick={() => void send()}
-              >
-                <ArrowUpIcon className="size-4" />
-              </ComposerSendButton>
-            </div>
-          </div>
-        </ComposerSurface.Host>
-      </ComposerSurface.Shell>
-      {hint ? <p className="px-2 pt-2 text-xs text-muted-foreground">{hint}</p> : null}
+          ) : (
+            <span className="truncate px-2.5 text-sm text-muted-foreground">{shownModel}</span>
+          )}
+          {draftHasExtras ? (
+            <span className="truncate text-xs text-muted-foreground">
+              Has attachments · send from the thread
+            </span>
+          ) : null}
+          <ComposerSendButton
+            aria-label="Send"
+            className="ms-auto"
+            disabled={!canSend}
+            onClick={() => void send()}
+          >
+            <ArrowUpIcon className="size-4" />
+          </ComposerSendButton>
+        </div>
+      </div>
+      {hint ? <p className="px-3 pt-2 text-xs text-muted-foreground">{hint}</p> : null}
       {trigger !== null ? (
         <ComposerCommandMenuLayer anchor={anchor}>
           <ComposerCommandMenu

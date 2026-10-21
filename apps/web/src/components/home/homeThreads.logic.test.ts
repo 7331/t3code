@@ -5,6 +5,7 @@ import { makeStreamingTimelineFixture, makeThreadFixture } from "../../test-fixt
 import {
   HOME_MAX_CARDS,
   homeCardSpansFullWidth,
+  homeCardThreadActions,
   latestHomeCardMessages,
   selectHomeThreads,
 } from "./homeThreads.logic";
@@ -106,5 +107,54 @@ describe("homeCardSpansFullWidth", () => {
     expect(spans(3)).toEqual([true, false, false]);
     expect(spans(4)).toEqual([true, false, false, true]);
     expect(spans(5)).toEqual([true, false, false, false, false]);
+  });
+});
+
+describe("homeCardThreadActions", () => {
+  const topLevel = makeThreadFixture({ id: ThreadId.make("top") });
+  const fork = makeThreadFixture({
+    id: ThreadId.make("fork"),
+    lineage: {
+      rootThreadId: topLevel.id,
+      parentThreadId: topLevel.id,
+      relationshipToParent: "fork",
+    },
+  });
+  const subagent = makeThreadFixture({
+    id: ThreadId.make("child"),
+    lineage: {
+      rootThreadId: topLevel.id,
+      parentThreadId: topLevel.id,
+      relationshipToParent: "subagent",
+    },
+  });
+  const supported = { supportsPinning: true, supportsSettlement: true };
+
+  it("offers pin and settle on top-level threads, forks included", () => {
+    expect(homeCardThreadActions({ thread: topLevel, ...supported })).toEqual({
+      pin: true,
+      settle: true,
+    });
+    expect(homeCardThreadActions({ thread: fork, ...supported })).toEqual({
+      pin: true,
+      settle: true,
+    });
+  });
+
+  it("never offers them on subagent threads, which have no sidebar row", () => {
+    expect(homeCardThreadActions({ thread: subagent, ...supported })).toEqual({
+      pin: false,
+      settle: false,
+    });
+  });
+
+  it("follows the environment's capabilities", () => {
+    expect(
+      homeCardThreadActions({
+        thread: topLevel,
+        supportsPinning: false,
+        supportsSettlement: true,
+      }),
+    ).toEqual({ pin: false, settle: true });
   });
 });

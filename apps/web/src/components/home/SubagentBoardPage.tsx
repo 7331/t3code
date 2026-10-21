@@ -20,6 +20,7 @@ import {
 } from "./HomeLayout";
 import { HomeThreadCard } from "./HomeThreadCard";
 import { selectSubagentBoardChildren, subagentCardTitle } from "./subagentBoard.logic";
+import { useHomeCardActions } from "./useHomeCardActions";
 
 /** One thread and its subagents as cards, so a fan-out can be watched and steered in one place. */
 export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThreadRef }) {
@@ -27,6 +28,7 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
   const relationshipShells = useThreadRelationshipShells(parentRef);
   const threads = useThreadShells();
   const collapsed = useCollapsedHomeCards();
+  const cardActions = useHomeCardActions();
 
   const shellsById = new Map(
     threads
@@ -70,8 +72,7 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
           }
           collapsed={collapsed.isCollapsed(key)}
           onToggleCollapsed={() => collapsed.toggle(key)}
-          pin={null}
-          settle={null}
+          {...cardActions(thread)}
           readOnly={role === "read-only" || (role === "parent" && parentReadOnly)}
           {...(subagentStatus === undefined ? {} : { subagentStatus })}
           replyHint={
