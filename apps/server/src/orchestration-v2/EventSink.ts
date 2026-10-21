@@ -244,7 +244,12 @@ const layerBase: Layer.Layer<
           );
         }
       });
-    const recordRunOutcomes = makeRunOutcomeRecorder();
+    const recordRunOutcomes = makeRunOutcomeRecorder((threadId) =>
+      // One payload row; unlike the shell, it still resolves a deleted child thread.
+      projectionStore
+        .getThread(threadId)
+        .pipe(Effect.map((thread) => thread.lineage.relationshipToParent === "subagent")),
+    );
     // Recorded before publication, so an interrupted publish cannot lose a committed outcome.
     const publishStoredEvents = (events: ReadonlyArray<OrchestrationV2StoredEvent>) =>
       recordRunOutcomes(events).pipe(

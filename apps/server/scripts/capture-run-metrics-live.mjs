@@ -363,15 +363,20 @@ try {
       NodePath.join(evidence, "scenarios.ndjson"),
       JSON.stringify({ row, at: new Date().toISOString(), projection }) + "\n",
     );
+    // Mirrors the recorder: a subagent thread's runs are delegated even without a task association.
+    const subagent = projection.thread.lineage.relationshipToParent === "subagent";
     for (const run of projection.runs)
       if (["completed", "cancelled", "interrupted", "failed"].includes(run.status))
-        terminalRuns.set(run.id, run);
+        terminalRuns.set(run.id, {
+          ...run,
+          delegated: subagent || run.delegatedTaskId !== undefined,
+        });
   };
   const barrier = async (row) => {
     const boundary = capture.receipts.length;
     const expected = {};
     for (const run of terminalRuns.values()) {
-      const key = run.status + ":" + (run.delegatedTaskId !== undefined);
+      const key = run.status + ":" + run.delegated;
       expected[key] = (expected[key] ?? 0) + 1;
     }
     const receipt = await capture.wait((r) => {
@@ -714,62 +719,70 @@ try {
       );
     }
     saveProjection("S-delegate-parent-initial", final);
-    const childId = final.subagents[0].childThreadId;
-    const initialChild = yield* client["orchestration.getThreadProjection"]({ threadId: childId });
-    saveProjection("S-delegate-child-initial", initialChild);
-    const lastChildOrdinal = Math.max(...initialChild.runs.map((r) => r.ordinal));
-    const lastParentOrdinal = Math.max(...final.runs.map((r) => r.ordinal));
-    const followup = {
-      type: "message.dispatch",
-      commandId: CommandId.make(NodeCrypto.randomUUID()),
-      threadId: childId,
-      messageId: MessageId.make(NodeCrypto.randomUUID()),
-      createdBy: "user",
-      creationSource: "web",
-      text: "Reply exactly METRIC_CHILD_FOLLOWUP; do not call tools.",
-      attachments: [],
-      dispatchMode: { type: "start_immediately" },
-    };
-    const receipt = yield* client["orchestration.dispatchCommand"](followup);
-    NodeFS.appendFileSync(
-      NodePath.join(evidence, "commands.ndjson"),
-      JSON.stringify({ at: new Date().toISOString(), command: followup, receipt }) + "\n",
-    );
-    const observeThread = (id, predicate) =>
-      client["orchestration.subscribeThread"]({ threadId: id }).pipe(
-        Stream.mapEffect((item) =>
-          Effect.gen(function* () {
-            NodeFS.appendFileSync(
-              NodePath.join(evidence, "followup-events.ndjson"),
-              JSON.stringify({ threadId: id, item }) + "\n",
-            );
-            return item.kind === "snapshot"
-              ? item.projection
-              : yield* client["orchestration.getThreadProjection"]({ threadId: id });
-          }),
-        ),
-        Stream.filter(predicate),
-        Stream.take(1),
-        Stream.runCollect,
-        Effect.map((xs) => xs[0]),
+    // Native background work has no app-owned child to follow up.
+    if (values.scenario !== "native") {
+      const childId = final.subagents[0].childThreadId;
+      const initialChild = yield* client["orchestration.getThreadProjection"]({
+        threadId: childId,
+      });
+      saveProjection("S-delegate-child-initial", initialChild);
+      // The initial child run is delegated through lineage alone; only follow-ups carry a task id.
+      NodeAssert.equal(initialChild.thread.lineage.relationshipToParent, "subagent");
+      NodeAssert.ok(initialChild.runs.every((r) => r.delegatedTaskId === undefined));
+      const lastChildOrdinal = Math.max(...initialChild.runs.map((r) => r.ordinal));
+      const lastParentOrdinal = Math.max(...final.runs.map((r) => r.ordinal));
+      const followup = {
+        type: "message.dispatch",
+        commandId: CommandId.make(NodeCrypto.randomUUID()),
+        threadId: childId,
+        messageId: MessageId.make(NodeCrypto.randomUUID()),
+        createdBy: "user",
+        creationSource: "web",
+        text: "Reply exactly METRIC_CHILD_FOLLOWUP; do not call tools.",
+        attachments: [],
+        dispatchMode: { type: "start_immediately" },
+      };
+      const receipt = yield* client["orchestration.dispatchCommand"](followup);
+      NodeFS.appendFileSync(
+        NodePath.join(evidence, "commands.ndjson"),
+        JSON.stringify({ at: new Date().toISOString(), command: followup, receipt }) + "\n",
       );
-    const child = yield* observeThread(childId, (p) =>
-      p.runs.some((r) => r.ordinal > lastChildOrdinal && r.status === "completed"),
-    );
-    NodeAssert.ok(
-      child.runs.some((r) => r.ordinal > lastChildOrdinal && r.delegatedTaskId !== undefined),
-      "Follow-up child lacks delegatedTaskId",
-    );
-    saveProjection("S-delegate-child-followup", child);
-    final = yield* observeThread(
-      threadId,
-      (p) =>
-        p.runs.some((r) => r.ordinal > lastParentOrdinal && r.status === "completed") &&
-        p.runs.every((r) =>
-          ["completed", "failed", "cancelled", "interrupted", "rolled_back"].includes(r.status),
-        ),
-    );
-    saveProjection("S-delegate-parent-followup", final);
+      const observeThread = (id, predicate) =>
+        client["orchestration.subscribeThread"]({ threadId: id }).pipe(
+          Stream.mapEffect((item) =>
+            Effect.gen(function* () {
+              NodeFS.appendFileSync(
+                NodePath.join(evidence, "followup-events.ndjson"),
+                JSON.stringify({ threadId: id, item }) + "\n",
+              );
+              return item.kind === "snapshot"
+                ? item.projection
+                : yield* client["orchestration.getThreadProjection"]({ threadId: id });
+            }),
+          ),
+          Stream.filter(predicate),
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.map((xs) => xs[0]),
+        );
+      const child = yield* observeThread(childId, (p) =>
+        p.runs.some((r) => r.ordinal > lastChildOrdinal && r.status === "completed"),
+      );
+      NodeAssert.ok(
+        child.runs.some((r) => r.ordinal > lastChildOrdinal && r.delegatedTaskId !== undefined),
+        "Follow-up child lacks delegatedTaskId",
+      );
+      saveProjection("S-delegate-child-followup", child);
+      final = yield* observeThread(
+        threadId,
+        (p) =>
+          p.runs.some((r) => r.ordinal > lastParentOrdinal && r.status === "completed") &&
+          p.runs.every((r) =>
+            ["completed", "failed", "cancelled", "interrupted", "rolled_back"].includes(r.status),
+          ),
+      );
+      saveProjection("S-delegate-parent-followup", final);
+    }
     NodeFS.writeFileSync(
       NodePath.join(evidence, "projection.json"),
       JSON.stringify(final, null, 2),

@@ -1,7 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
   EventId,
-  NodeId,
   ProviderInstanceId,
   RunId,
   ThreadId,
@@ -16,6 +15,8 @@ import { makeRunOutcomeRecorder } from "./RunMetrics.ts";
 
 const at = (iso: string) => DateTime.makeUnsafe(iso);
 const threadId = ThreadId.make("thread:metrics");
+// Stands in for the projection store's thread lineage.
+const topLevelThread = () => Effect.succeed(false);
 
 // Each test labels its runs with its own provider, since the metric registry is shared.
 const runUpdated = (
@@ -55,19 +56,23 @@ const runSnapshots = (provider: string) =>
 describe("makeRunOutcomeRecorder", () => {
   it.effect("records a finished run once, labelled, with its queue wait and duration", () =>
     Effect.gen(function* () {
-      const record = makeRunOutcomeRecorder();
+      // A subagent thread's first run carries no delegatedTaskId; only its lineage says delegated.
+      const lookups: Array<ThreadId> = [];
+      const record = makeRunOutcomeRecorder((id) =>
+        Effect.sync(() => lookups.push(id)).pipe(Effect.as(true)),
+      );
       const finished = {
         id: RunId.make("run:metrics:once"),
         status: "completed" as const,
         startedAt: at("2026-10-19T12:00:30.000Z"),
         completedAt: at("2026-10-19T12:10:30.000Z"),
-        delegatedTaskId: NodeId.make("task:metrics"),
       };
 
       yield* record([runUpdated(1, "p1", { ...finished, status: "running", completedAt: null })]);
       yield* record([runUpdated(2, "p1", finished)]);
       // Later updates to a finished run, such as its checkpoint, are not another run.
       yield* record([runUpdated(3, "p1", finished)]);
+      assert.deepStrictEqual(lookups, [threadId]);
 
       const snapshots = yield* runSnapshots("p1");
       const byId = (id: string) => snapshots.find((snapshot) => snapshot.id === id);
@@ -91,7 +96,7 @@ describe("makeRunOutcomeRecorder", () => {
   it.effect("does not count a rollback of a run that already finished", () =>
     Effect.gen(function* () {
       // A fresh recorder stands in for a restart, which forgets the runs already counted.
-      const record = makeRunOutcomeRecorder();
+      const record = makeRunOutcomeRecorder(topLevelThread);
       yield* record([
         runUpdated(1, "p2", {
           id: RunId.make("run:metrics:rolled-back"),
@@ -107,7 +112,8 @@ describe("makeRunOutcomeRecorder", () => {
 
   it.effect("counts a run cancelled before it started without timing it", () =>
     Effect.gen(function* () {
-      const record = makeRunOutcomeRecorder();
+      // An unreadable lineage costs only the label, never the committed outcome.
+      const record = makeRunOutcomeRecorder(() => Effect.fail("projection read failed"));
       yield* record([
         runUpdated(1, "p3", {
           id: RunId.make("run:metrics:cancelled"),
@@ -118,8 +124,11 @@ describe("makeRunOutcomeRecorder", () => {
       ]);
 
       assert.deepStrictEqual(
-        (yield* runSnapshots("p3")).map((snapshot) => snapshot.id),
-        ["t3_runs_total"],
+        (yield* runSnapshots("p3")).map((snapshot) => [
+          snapshot.id,
+          snapshot.attributes?.["delegated"],
+        ]),
+        [["t3_runs_total", "false"]],
       );
     }),
   );

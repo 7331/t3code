@@ -248,6 +248,64 @@ for (const id of ["I01", "I02-current", "I02-owner", "I02-unchanged", "I03", "I0
   );
   result.push(await Effect.runPromise(program));
 }
+// The production EventSink labels runs from the committed thread lineage.
+{
+  const childId = "thread:integration-child";
+  const child = {
+    ...thread,
+    id: childId,
+    lineage: { parentThreadId: threadId, relationshipToParent: "subagent", rootThreadId: threadId },
+  };
+  const eventOn = (tid, type, payload) => ({ ...event(type, payload), threadId: tid });
+  const runs = [
+    { ...run, id: "run:i06-parent" },
+    { ...run, id: "run:i06-child-initial", threadId: childId },
+    {
+      ...run,
+      id: "run:i06-child-followup",
+      threadId: childId,
+      ordinal: 2,
+      delegatedTaskId: "task:i06",
+    },
+  ];
+  const program = Effect.gen(function* () {
+    const sink = yield* EventSink.EventSinkV2;
+    yield* sink.write({
+      events: [
+        event("thread.created", thread),
+        eventOn(childId, "thread.created", child),
+        ...runs.map((r) =>
+          eventOn(r.threadId, "run.created", { ...r, status: "running", completedAt: null }),
+        ),
+      ],
+    });
+    const before = yield* snapshot;
+    yield* sink.write({ events: runs.map((r) => eventOn(r.threadId, "run.updated", r)) });
+    const after = yield* snapshot;
+    const counts = Object.fromEntries(
+      after
+        .filter((s) => s.id === "t3_runs_total")
+        .map((s) => [s.attributes.delegated, s.state.count]),
+    );
+    NodeAssert.deepEqual(counts, feature ? { false: 1, true: 2 } : {});
+    return {
+      row: "I06",
+      route: "HARNESS CAPTURE / production EventSink + projection lineage",
+      sha,
+      feature,
+      input: { threads: [thread, child], runs },
+      before,
+      after,
+      observations: { counts },
+      status: "passed",
+    };
+  }).pipe(
+    Effect.provide(EventSink.layer.pipe(Layer.provideMerge(stores))),
+    Effect.scoped,
+    Effect.provideService(Metric.MetricRegistry, new Map()),
+  );
+  result.push(await Effect.runPromise(program));
+}
 // Synchronous metric hooks request fiber interruption exactly after the first instrument update.
 if (feature) {
   const { makeRunOutcomeRecorder } = await local("orchestration-v2/RunMetrics");
@@ -269,7 +327,9 @@ if (feature) {
   };
   const program = Effect.gen(function* () {
     yield* Effect.promise(() => release.promise);
-    yield* makeRunOutcomeRecorder()([{ sequence: 1, commandId: null, event: runEvent() }]);
+    yield* makeRunOutcomeRecorder(() => Effect.succeed(false))([
+      { sequence: 1, commandId: null, event: runEvent() },
+    ]);
   });
   fiber = Effect.runFork(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
   release.resolve();

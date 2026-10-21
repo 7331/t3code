@@ -20,6 +20,8 @@ const make = feature
   ? (await import(NodeURL.pathToFileURL(root + "/apps/server/src/orchestration-v2/RunMetrics.ts")))
       .makeRunOutcomeRecorder
   : () => () => Effect.void;
+// Stands in for the projection store: only thread:child has subagent lineage.
+const isSubagentThread = (threadId) => Effect.succeed(threadId === "thread:child");
 const sha = NodeChildProcess.execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: root,
   encoding: "utf8",
@@ -96,7 +98,7 @@ for (const providerInstanceId of fixture.providers)
       }
 for (const status of fixture.outcomes)
   row("E01-" + status, [[event("r", { status, startedAt: null })]], [1, 0, 0, 0, 0]);
-for (const [id, patch, expected] of [
+for (const [id, patch, expected, options] of [
   ["E02", { completedAt: null }, [1, 1, 30000, 0, 0]],
   ["E03", { startedAt: null, completedAt: null }, [1, 0, 0, 0, 0]],
   ["E04", { requestedAt: at(0), startedAt: at(0), completedAt: at(0) }, [1, 1, 0, 1, 0]],
@@ -122,17 +124,20 @@ for (const [id, patch, expected] of [
     { modelSelection: { instanceId: "proof:secondary", model: "gpt" } },
     [1, 1, 30000, 1, 600000],
   ],
-  ...["absent", "present", "parent"].map((v, i) => [
+  ...["absent", "present", "parent", "lineage"].map((v, i) => [
     "E11-" + i,
     v === "present"
       ? { delegatedTaskId: "task:proof" }
       : v === "parent"
         ? { subagents: ["child"] }
-        : {},
+        : v === "lineage"
+          ? { threadId: "thread:child" }
+          : {},
     [1, 1, 30000, 1, 600000],
+    { delegated: v === "present" || v === "lineage" },
   ]),
 ])
-  row(id, [[event("r", patch)]], expected);
+  row(id, [[event("r", patch)]], expected, options);
 for (const status of ["preparing", "queued", "starting", "running", "waiting"])
   row("N01-" + status, [[event("r", { status })]], [0, 0, 0, 0, 0]);
 for (const [i, type] of ["run.created", "node.updated", "attempt.updated"].entries())
@@ -206,11 +211,11 @@ row(
 const output = [];
 for (const r of rows) {
   const program = Effect.gen(function* () {
-    let record = make();
+    let record = make(isSubagentThread);
     const before = yield* Metric.snapshot;
     const stages = [];
     for (const [i, batch] of r.batches.entries()) {
-      if (r.reset && i) record = make();
+      if (r.reset && i) record = make(isSubagentThread);
       yield* record(batch);
       stages.push((yield* Metric.snapshot).filter((s) => s.id.startsWith("t3_run")));
     }
@@ -222,6 +227,9 @@ for (const r of rows) {
           { ...(s.type === "Histogram" ? { time_unit: "milliseconds" } : {}), ...r.expectedLabels },
           r.id + " labels",
         );
+    if (feature && r.delegated !== undefined)
+      for (const s of after)
+        NodeAssert.equal(s.attributes.delegated, String(r.delegated), r.id + " delegated");
     let totals = [0, 0, 0, 0, 0];
     for (const s of after) {
       if (s.id === "t3_runs_total") totals[0] += s.state.count;
