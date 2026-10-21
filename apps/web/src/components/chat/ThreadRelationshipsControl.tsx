@@ -45,6 +45,7 @@ import {
   BotIcon,
   CornerLeftUpIcon,
   GitForkIcon,
+  LayoutGridIcon,
   LoaderCircleIcon,
   MoreHorizontalIcon,
   PlusIcon,
@@ -318,6 +319,7 @@ export function ThreadRelationshipsPanel(props: {
       ? "previous"
       : "active";
   });
+  const hasSubagentChildren = active.length + previous.length > 0;
   const groups = [
     { id: "related", label: null, rows: related, expanded: true },
     { id: "active", label: null, rows: active, expanded: true },
@@ -404,28 +406,58 @@ export function ThreadRelationshipsPanel(props: {
       title={runningCount > 0 ? `Lineage · ${runningCount} running` : "Lineage"}
       data-thread-relationships-panel
       actions={
-        canDetach ? (
-          <Menu>
-            <MenuTrigger
-              render={
-                <ThreadDetailsControl
-                  size="icon-xs"
-                  variant="ghost"
-                  part="icon"
-                  aria-label="More thread actions"
-                  disabled={busyAction !== null}
-                />
-              }
-            >
-              <MoreHorizontalIcon className="size-3.5" />
-            </MenuTrigger>
-            <MenuPopup align="end" className="min-w-60 max-w-(--available-width)">
-              <MenuItem onClick={() => void detach()}>
-                <UnplugIcon className="size-3.5" />
-                Disconnect agent session
-              </MenuItem>
-            </MenuPopup>
-          </Menu>
+        hasSubagentChildren || canDetach ? (
+          <>
+            {hasSubagentChildren ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <ThreadDetailsControl
+                      size="icon-xs"
+                      variant="ghost"
+                      part="icon"
+                      aria-label="Open subagents board"
+                      onClick={() =>
+                        void navigate({
+                          to: "/home",
+                          search: {
+                            parentEnvironmentId: props.environmentId,
+                            parentThreadId: props.threadId,
+                          },
+                        })
+                      }
+                    />
+                  }
+                >
+                  <LayoutGridIcon className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipPopup side="top">Open subagents board</TooltipPopup>
+              </Tooltip>
+            ) : null}
+            {canDetach ? (
+              <Menu>
+                <MenuTrigger
+                  render={
+                    <ThreadDetailsControl
+                      size="icon-xs"
+                      variant="ghost"
+                      part="icon"
+                      aria-label="More thread actions"
+                      disabled={busyAction !== null}
+                    />
+                  }
+                >
+                  <MoreHorizontalIcon className="size-3.5" />
+                </MenuTrigger>
+                <MenuPopup align="end" className="min-w-60 max-w-(--available-width)">
+                  <MenuItem onClick={() => void detach()}>
+                    <UnplugIcon className="size-3.5" />
+                    Disconnect agent session
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
+            ) : null}
+          </>
         ) : null
       }
     >

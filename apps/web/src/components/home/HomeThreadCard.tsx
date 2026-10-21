@@ -5,11 +5,16 @@ import {
 } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { isAtomCommandInterrupted } from "@t3tools/client-runtime/state/runtime";
+import {
+  deriveProviderSubagentStatus,
+  formatProviderSubagentStatus,
+} from "@t3tools/client-runtime/state/thread-execution";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowUpIcon,
+  BotIcon,
   ChevronDownIcon,
   PinIcon,
   PinOffIcon,
@@ -46,12 +51,15 @@ export function HomeThreadCard({
   collapsed,
   onToggleCollapsed,
   pin,
+  readOnly = false,
 }: {
   readonly thread: EnvironmentThreadShell;
   readonly collapsed: boolean;
   readonly onToggleCollapsed: () => void;
   /** Absent when the thread's environment cannot pin. */
   readonly pin: { readonly pinned: boolean; readonly toggle: () => void } | null;
+  /** A provider-native subagent: the server rejects messages, so the card shows status instead. */
+  readonly readOnly?: boolean;
 }) {
   const navigate = useNavigate();
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
@@ -120,7 +128,11 @@ export function HomeThreadCard({
               threadRef={threadRef}
               cwd={thread.worktreePath ?? project?.workspaceRoot}
             />
-            <HomeCardComposer thread={thread} threadRef={threadRef} />
+            {readOnly ? (
+              <HomeCardProviderSubagentFooter thread={thread} threadRef={threadRef} />
+            ) : (
+              <HomeCardComposer thread={thread} threadRef={threadRef} />
+            )}
           </>
         )}
       </AnimatedHeight>
@@ -221,6 +233,31 @@ function HomeCardTranscript({
           )
         )}
       </div>
+    </div>
+  );
+}
+
+function HomeCardProviderSubagentFooter({
+  thread,
+  threadRef,
+}: {
+  readonly thread: EnvironmentThreadShell;
+  readonly threadRef: ScopedThreadRef;
+}) {
+  const projection = useThreadProjection(threadRef)?.projection ?? null;
+  const status = projection === null ? null : deriveProviderSubagentStatus(projection);
+  // Without a start time the label stays static; a ticking timer per card is not worth the repaints.
+  const statusLabel = formatProviderSubagentStatus(
+    status === null ? null : { ...status, startedAt: null },
+    0,
+  );
+  return (
+    <div className="flex items-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
+      <BotIcon className="size-3.5 shrink-0" />
+      <span className="truncate">
+        {statusLabel} · {thread.modelSelection.model}
+      </span>
+      <span className="ms-auto shrink-0">Run by the provider; reply in the parent</span>
     </div>
   );
 }
