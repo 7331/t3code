@@ -74,6 +74,7 @@ import React, {
   useLayoutEffect,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 import type {
@@ -1475,6 +1476,11 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <MarkdownDetails open={detailsOpen}>{children}</MarkdownDetails>;
   },
   pre: function MarkdownPre({ node, children, ...props }) {
+    // Lets the reader correct a mistagged fence, which also decides whether Run
+    // is offered. It lasts while the block is mounted, like the wrap toggle.
+    const [languageOverride, setLanguageOverride] = useState<string | null>(null);
+    // A transition keeps the current highlighting on screen while the new grammar loads.
+    const [, startLanguageTransition] = useTransition();
     const {
       resolvedTheme,
       diffThemeName,
@@ -1501,9 +1507,11 @@ const CHAT_MARKDOWN_COMPONENTS = {
       return <MarkdownMath tex={codeBlock.code} display focusable={!inline} />;
     }
     const fenceTitle = extractFenceTitle(extractPreCodeMeta(node));
+    const displayLanguage = languageOverride ?? language;
+    const isComplete = !isStreaming && isClosedCodeFence(node, text, codeBlock.code);
     const highlightedCode = (
       <RenderErrorBoundary
-        resetKeys={[codeBlock.code, language, diffThemeName, isStreaming]}
+        resetKeys={[codeBlock.code, displayLanguage, diffThemeName, isStreaming]}
         fallback={<pre {...props}>{children}</pre>}
       >
         <Suspense
@@ -1514,7 +1522,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
           }
         >
           <SuspenseShikiCodeBlock
-            className={codeBlock.className}
+            language={displayLanguage}
             code={codeBlock.code}
             themeName={diffThemeName}
             isStreaming={isStreaming}
@@ -1538,12 +1546,13 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return (
       <MarkdownCodeBlock
         code={codeBlock.code}
-        language={language}
+        language={displayLanguage}
         fenceTitle={fenceTitle}
         theme={resolvedTheme}
-        onRunShellCommand={
-          onRunShellCommand && !isStreaming && isClosedCodeFence(node, text, codeBlock.code)
-            ? onRunShellCommand
+        onRunShellCommand={onRunShellCommand && isComplete ? onRunShellCommand : undefined}
+        onLanguageChange={
+          isComplete
+            ? (next) => startLanguageTransition(() => setLanguageOverride(next))
             : undefined
         }
         isStreaming={isStreaming}

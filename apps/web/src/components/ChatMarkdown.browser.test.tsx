@@ -161,6 +161,36 @@ describe("ChatMarkdown streaming", () => {
     }
   });
 
+  it("offers Run after the reader retags a finished block as Bash", async () => {
+    setup();
+    const onRunShellCommand = vi.fn();
+    const message = (isStreaming: boolean) => (
+      <ChatMarkdown
+        cwd="/tmp/project"
+        text={"```text\necho hello\n```"}
+        isStreaming={isStreaming}
+        onRunShellCommand={onRunShellCommand}
+      />
+    );
+    await using screen = await render(message(true));
+    const { container, rerender } = screen;
+    const pickers = () => buttonsLabelled(container, "Code language: Plain text");
+    expect(pickers()).toHaveLength(0);
+
+    await rerender(message(false));
+    expect(buttonsLabelled(container, "Run in terminal")).toHaveLength(0);
+    await act(async () => pickers()[0]!.click());
+    const bash = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === "Bash",
+    );
+    await act(async () => bash!.click());
+    await vi.waitFor(() => expect(buttonsLabelled(container, "Run in terminal")).toHaveLength(1));
+    expect(container.querySelector('[data-language="bash"]')).not.toBeNull();
+
+    await act(async () => buttonsLabelled(container, "Run in terminal")[0]!.click());
+    expect(onRunShellCommand).toHaveBeenCalledExactlyOnceWith("echo hello");
+  });
+
   it("edits the current task text and marker after reusing a renderer", async () => {
     setup();
     let editedText: string | undefined;
