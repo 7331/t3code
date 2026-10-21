@@ -547,6 +547,45 @@ describe("GitCafePullRequestProvider", () => {
     }).pipe(Effect.provide(server.layer));
   });
 
+  it.effect("summarizes line counts once per revision", () => {
+    const snapshot = { version: 4, headOid, comparisonBaseOid: baseOid };
+    const server = fakeGitCafe({
+      "GET /repos/owner/repo/pulls/7": pull,
+      "GET /repos/owner/repo/pulls/7/changes": {
+        ...snapshot,
+        items: [{ path: "a.ts" }, { path: "b.ts" }],
+        next: null,
+      },
+      "POST /repos/owner/repo/pulls/7/diff-files": (request: SentRequest) => ({
+        ...snapshot,
+        items: (request.body as { paths: ReadonlyArray<string> }).paths.map((path) => ({
+          path,
+          additions: 3,
+          deletions: 1,
+        })),
+      }),
+    });
+    return Effect.gen(function* () {
+      const provider = yield* GitCafePullRequestProvider.make;
+      const first = yield* provider.getChangeRequestSummary!(target);
+      const second = yield* provider.getChangeRequestSummary!(target);
+      const listed = yield* provider.listChangeRequestStats!({
+        cwd: target.cwd,
+        host: target.host,
+        changeRequests: [{ repository: "owner/repo", number: 7 }],
+      });
+      assert.deepInclude(first, { additions: 6, deletions: 2, changedFiles: 2 });
+      assert.deepInclude(second, { additions: 6, deletions: 2, changedFiles: 2 });
+      assert.deepStrictEqual(listed, [
+        { repository: "owner/repo", number: 7, additions: 6, deletions: 2 },
+      ]);
+      assert.lengthOf(
+        server.sent.filter((request) => request.path.endsWith("/changes")),
+        1,
+      );
+    }).pipe(Effect.provide(server.layer));
+  });
+
   it.effect("fences a native merge on the target branch's current commit", () => {
     const branchOid = "fedcba9876543210fedcba9876543210fedcba98";
     const server = fakeGitCafe({

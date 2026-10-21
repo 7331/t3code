@@ -53,6 +53,7 @@ const DIFF_FILES_BATCH = 64;
  */
 const LINE_STATS_MAX_FILES = DIFF_FILES_BATCH * 4;
 const MAX_CHANGE_PAGES = 20;
+const LINE_STATS_CACHE_SIZE = 256;
 
 const chunk = <A>(items: ReadonlyArray<A>, size: number): Array<ReadonlyArray<A>> =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
@@ -390,13 +391,34 @@ export const make = Effect.gen(function* () {
             chunk(detailablePaths(files), DIFF_FILES_BATCH),
             (paths) => readDiffFiles(input, revision, paths),
             { concurrency: 4 },
-          ).pipe(Effect.orElseSucceed(() => [[]]))).flat();
+          )).flat();
     return {
       changedFiles: files.length,
       additions: counted.reduce((total, file) => total + (file.additions ?? 0), 0),
       deletions: counted.reduce((total, file) => total + (file.deletions ?? 0), 0),
     };
   });
+
+  // GitCafe's pulls carry no line totals, and linked pull requests are summarized every minute,
+  // so totals are held per revision rather than recounted from hunks on every read.
+  const lineStatsByRevision = new Map<string, Effect.Success<ReturnType<typeof readLineStats>>>();
+  const lineStats = (
+    input: PullRef,
+    pull: { readonly version: number; readonly headOid: string },
+  ) => {
+    const key = `${input.host} ${input.repository.toLowerCase()} ${input.number} ${pull.version} ${pull.headOid}`;
+    const held = lineStatsByRevision.get(key);
+    if (held !== undefined) return Effect.succeed(held);
+    return readLineStats(input, pull.version).pipe(
+      Effect.tap((stats) =>
+        Effect.sync(() => {
+          if (lineStatsByRevision.size >= LINE_STATS_CACHE_SIZE)
+            lineStatsByRevision.delete(lineStatsByRevision.keys().next().value!);
+          lineStatsByRevision.set(key, stats);
+        }),
+      ),
+    );
+  };
 
   const merge = Effect.fn("GitCafePullRequestProvider.merge")(function* (
     input: Parameters<PullRequestProviderApi["runAction"]>[0],
@@ -525,14 +547,43 @@ export const make = Effect.gen(function* () {
         };
       },
     ),
-    getChangeRequestSummary: (input) =>
-      readPull("getChangeRequestSummary", input).pipe(
-        Effect.map((pull) => ({
+    listChangeRequestStats: (input) =>
+      Effect.forEach(
+        input.changeRequests,
+        ({ repository, number }) => {
+          const ref = { cwd: input.cwd, host: input.host, repository, number };
+          return readPull("listChangeRequestStats", ref).pipe(
+            Effect.flatMap((pull) =>
+              pull.headOid === null
+                ? Effect.succeed([])
+                : lineStats(ref, { version: pull.version, headOid: pull.headOid }).pipe(
+                    Effect.map(({ additions, deletions }) => [
+                      { repository, number, additions, deletions },
+                    ]),
+                  ),
+            ),
+            Effect.orElseSucceed(() => []),
+          );
+        },
+        { concurrency: 4 },
+      ).pipe(Effect.map((stats) => stats.flat())),
+    getChangeRequestSummary: Effect.fn("GitCafePullRequestProvider.getChangeRequestSummary")(
+      function* (input) {
+        const pull = yield* readPull("getChangeRequestSummary", input);
+        const changes =
+          pull.headOid === null
+            ? null
+            : yield* lineStats(input, { version: pull.version, headOid: pull.headOid }).pipe(
+                Effect.orElseSucceed(() => null),
+              );
+        return {
           ...Json.toChangeRequest(pull, input),
+          ...(changes === null ? {} : changes),
           closedAt: pull.closedAt,
           mergedAt: pull.mergedAt,
-        })),
-      ),
+        };
+      },
+    ),
     getChangeRequest: Effect.fn("GitCafePullRequestProvider.getChangeRequest")(function* (input) {
       const pull = yield* readPull("getChangeRequest", input);
       const path = yield* pullPath("getChangeRequest", input);
@@ -550,7 +601,9 @@ export const make = Effect.gen(function* () {
               ),
           pull.headOid === null
             ? Effect.succeed(null)
-            : readLineStats(input, pull.version).pipe(Effect.orElseSucceed(() => null)),
+            : lineStats(input, { version: pull.version, headOid: pull.headOid }).pipe(
+                Effect.orElseSucceed(() => null),
+              ),
         ],
         { concurrency: 3 },
       );
