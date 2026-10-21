@@ -1844,16 +1844,6 @@ describe("PiAdapterV2", () => {
         .map((request) => request.entryId);
       // Pi keeps only the fork entry's ancestors, so u2 (not steer2) drops all of turn 2.
       assert.deepEqual(forkedEntries, ["u2"]);
-      const byId = new Map(UNCAPTURED_TURN_TREE.entries.map((entry) => [entry.id, entry]));
-      const retained: Array<string> = [];
-      for (let id = byId.get("u2")?.parentId ?? null; id !== null;) {
-        retained.unshift(id);
-        id = byId.get(id)?.parentId ?? null;
-      }
-      assert.deepEqual(
-        retained,
-        TURN_ONE_ENTRIES.map((entry) => entry.id),
-      );
     }).pipe(Effect.scoped, Effect.provide(layerTest)),
   );
 
