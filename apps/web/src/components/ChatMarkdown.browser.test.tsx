@@ -2,6 +2,7 @@ import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { type ReactElement } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { userEvent } from "vite-plus/test/browser";
 
 import { act, render } from "../../test/render";
 import "../index.css";
@@ -189,6 +190,14 @@ describe("ChatMarkdown streaming", () => {
 
     await act(async () => buttonsLabelled(container, "Run in terminal")[0]!.click());
     expect(onRunShellCommand).toHaveBeenCalledExactlyOnceWith("echo hello");
+
+    await userEvent.click(buttonsLabelled(container, "Code language: Bash")[0]!);
+    const plain = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === "Plain text",
+    );
+    await userEvent.click(plain!);
+    await vi.waitFor(() => expect(buttonsLabelled(container, "Run in terminal")).toHaveLength(0));
+    expect(container.querySelector('[data-language="text"]')).not.toBeNull();
   });
 
   it("edits the current task text and marker after reusing a renderer", async () => {
