@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import { ArrowLeftIcon, ChartNoAxesColumnIcon, HouseIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -180,6 +180,10 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     closeMobileSidebar();
     void navigate({ to: "/settings" });
   };
+  const handleHomeClick = () => {
+    closeMobileSidebar();
+    void navigate({ to: "/home" });
+  };
 
   const handleUsageClick = () => {
     if (isMobile) {
@@ -204,6 +208,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         </SidebarMenuItem>
       ) : (
         <>
+          <SidebarUtilityItem icon={<HouseIcon />} label="Home" onClick={handleHomeClick} />
           <SidebarUtilityItem
             icon={<SettingsIcon />}
             label="Settings"
