@@ -3,25 +3,14 @@ import { Tool } from "effect/ai";
 
 import { OrchestratorToolkit } from "./tools.ts";
 
-interface PropertySchema {
-  readonly maximum?: number;
-  readonly description?: string;
-  readonly anyOf?: ReadonlyArray<PropertySchema>;
-}
-
-// Codex shows models a TypeScript view of each tool that drops minimum, maximum and any
-// description inside anyOf, so an enforced bound must be stated on the property itself.
-it("states t3_thread_read numeric bounds in the parameter descriptions", () => {
+// Oversized page sizes clamp on decode, so the schema has no `maximum`; Codex also drops
+// bounds from its TypeScript view. The description is the only place a model sees a limit.
+it("states t3_thread_read page size limits in the parameter descriptions", () => {
   const schema = Tool.getJsonSchema(OrchestratorToolkit.tools.t3_thread_read) as {
-    readonly properties: Readonly<Record<string, PropertySchema>>;
+    readonly properties: Readonly<Record<string, { readonly description?: string }>>;
   };
-  const bounded = Object.entries(schema.properties).flatMap(([name, property]) =>
-    [property, ...(property.anyOf ?? [])]
-      .filter((member) => member.maximum !== undefined && member.maximum < Number.MAX_SAFE_INTEGER)
-      .map((member) => [name, property.description, member.maximum] as const),
-  );
-  expect(bounded.map(([name]) => name)).toEqual(["limit", "runLimit", "maxCharsPerItem"]);
-  for (const [name, description, maximum] of bounded) {
-    expect(description, name).toContain(String(maximum));
+  const limits = { limit: "100", runLimit: "50", maxCharsPerItem: "50000" };
+  for (const [name, maximum] of Object.entries(limits)) {
+    expect(schema.properties[name]?.description, name).toContain(maximum);
   }
 });
