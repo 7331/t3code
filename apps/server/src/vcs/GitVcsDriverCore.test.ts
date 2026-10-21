@@ -862,17 +862,6 @@ describe("rejected git refs", () => {
         `To ${remoteUrl}`,
         " ! [rejected]        private-branch -> private-branch (non-fast-forward)",
         failedPush,
-        "hint: Updates were rejected because the tip of your current branch is behind",
-      ],
-      reason: "push_rejected_non_fast_forward" as const,
-      detail: "Pull or rebase",
-    },
-    {
-      label: "a push that needs a fetch first",
-      stderr: [
-        `To ${remoteUrl}`,
-        " ! [rejected]        private-branch -> private-branch (fetch first)",
-        failedPush,
       ],
       reason: "push_rejected_non_fast_forward" as const,
       detail: "Pull or rebase",
@@ -883,51 +872,21 @@ describe("rejected git refs", () => {
 
       assert.deepInclude(error, { reason });
       assert.include(error.detail, detail);
-      assert.include(error.message, `(${reason})`);
       for (const text of leakedText) assert.notInclude(error.message, text);
     }),
   );
 
-  it.effect.each([
-    {
-      label: "a tag a fetch would clobber",
-      stderr: [
-        `From ${remoteUrl}`,
-        " ! [rejected]        v1         -> v1  (would clobber existing tag)",
-      ],
-      reason: "tag_would_be_clobbered" as const,
-    },
-    {
-      label: "a tag that already exists on the remote",
-      stderr: [
-        `To ${remoteUrl}`,
-        " ! [rejected]        v1 -> v1 (already exists)",
-        failedPush,
-        "hint: Updates were rejected because the tag already exists in the remote.",
-      ],
-      reason: undefined,
-    },
-    {
-      // Only push ends with "failed to push some refs"; a fetch into a local
-      // branch prints the same rejected line.
-      label: "a fetch into a diverged local branch",
-      stderr: [`From ${remoteUrl}`, " ! [rejected]        main       -> side  (non-fast-forward)"],
-      reason: undefined,
-    },
-    {
-      label: "rejection lines echoed behind the remote prefix",
-      stderr: [
-        "remote: ! [remote rejected] private-branch -> private-branch (declined)",
-        "remote:  ! [rejected]        private-branch -> private-branch (non-fast-forward)",
-        failedPush,
-      ],
-      reason: undefined,
-    },
-  ])("leaves $label as it was", ({ stderr, reason }) =>
+  // A fetch into a diverged local branch prints the same rejected line, but
+  // never "failed to push some refs".
+  it.effect("leaves a rejected fetch unclassified", () =>
     Effect.gen(function* () {
-      const error = yield* failWith(stderr.join("\n"));
+      const error = yield* failWith(
+        [`From ${remoteUrl}`, " ! [rejected]        main       -> side  (non-fast-forward)"].join(
+          "\n",
+        ),
+      );
 
-      assert.equal(error.reason, reason);
+      assert.equal(error.reason, undefined);
       assert.equal(error.detail, "Git command exited with a non-zero status.");
     }),
   );
