@@ -2,7 +2,12 @@ import { ProjectId, ThreadId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { makeStreamingTimelineFixture, makeThreadFixture } from "../../test-fixtures";
-import { HOME_MAX_CARDS, latestHomeCardMessages, selectHomeThreads } from "./homeThreads.logic";
+import {
+  HOME_MAX_CARDS,
+  homeCardSpansFullWidth,
+  latestHomeCardMessages,
+  selectHomeThreads,
+} from "./homeThreads.logic";
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 21, 9, minute)).toISOString();
 
@@ -88,5 +93,18 @@ describe("latestHomeCardMessages", () => {
       "live-user-item",
       "live-assistant-item",
     ]);
+  });
+});
+
+describe("homeCardSpansFullWidth", () => {
+  const spans = (count: number) =>
+    Array.from({ length: count }, (_, index) => homeCardSpansFullWidth(index, count));
+
+  it("spans the first card and a card left alone in the last row", () => {
+    expect(spans(1)).toEqual([true]);
+    expect(spans(2)).toEqual([true, true]);
+    expect(spans(3)).toEqual([true, false, false]);
+    expect(spans(4)).toEqual([true, false, false, true]);
+    expect(spans(5)).toEqual([true, false, false, false, false]);
   });
 });

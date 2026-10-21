@@ -30,7 +30,7 @@ export function HomePage() {
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
   const sortOrder = useClientSettings((settings) => settings.sidebarThreadSortOrder);
   const serverConfigs = useServerConfigs();
-  const { pinThread, unpinThread } = useThreadActions();
+  const { pinThread, confirmAndUnpinThread, settleThread, unsettleThread } = useThreadActions();
   const collapsed = useCollapsedHomeCards();
 
   if (bootstrapped && projects.length === 0) return <NoProjectsHero />;
@@ -40,11 +40,25 @@ export function HomePage() {
   const togglePin = async (thread: EnvironmentThreadShell) => {
     const ref = scopeThreadRef(thread.environmentId, thread.id);
     // Unpinning raises the sidebar's undo notice, so a card never leaves Home without a way back.
-    const result = thread.pinnedAt === null ? await pinThread(ref) : await unpinThread(ref);
+    const result =
+      thread.pinnedAt === null ? await pinThread(ref) : await confirmAndUnpinThread(ref);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",
         title: thread.pinnedAt === null ? "Couldn’t pin thread" : "Couldn’t unpin thread",
+      });
+    }
+  };
+
+  const toggleSettled = async (thread: EnvironmentThreadShell) => {
+    const ref = scopeThreadRef(thread.environmentId, thread.id);
+    const settled = thread.settledOverride === "settled";
+    // Both raise the sidebar's undo notice, as settling from the sidebar does.
+    const result = settled ? await unsettleThread(ref) : await settleThread(ref);
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      toastManager.add({
+        type: "error",
+        title: settled ? "Couldn’t unsettle thread" : "Couldn’t settle thread",
       });
     }
   };
@@ -82,9 +96,8 @@ export function HomePage() {
           <HomeCardGrid
             cards={selection.threads.map((thread) => {
               const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-              const canPin =
-                serverConfigs.get(thread.environmentId)?.environment.capabilities.threadPinning ===
-                true;
+              const capabilities = serverConfigs.get(thread.environmentId)?.environment
+                .capabilities;
               return {
                 key,
                 card: (
@@ -93,10 +106,15 @@ export function HomePage() {
                     collapsed={collapsed.isCollapsed(key)}
                     onToggleCollapsed={() => collapsed.toggle(key)}
                     pin={
-                      canPin
+                      capabilities?.threadPinning === true
+                        ? { active: thread.pinnedAt !== null, toggle: () => void togglePin(thread) }
+                        : null
+                    }
+                    settle={
+                      capabilities?.threadSettlement === true
                         ? {
-                            pinned: thread.pinnedAt !== null,
-                            toggle: () => void togglePin(thread),
+                            active: thread.settledOverride === "settled",
+                            toggle: () => void toggleSettled(thread),
                           }
                         : null
                     }

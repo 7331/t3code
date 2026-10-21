@@ -8,6 +8,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { SidebarInset } from "../ui/sidebar";
 import { WorkspaceBreadcrumb } from "../WorkspaceBreadcrumb";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { homeCardSpansFullWidth } from "./homeThreads.logic";
 
 const COLLAPSED_CARDS_STORAGE_KEY = "t3code:home:collapsed-threads";
 const CollapsedCardKeys = Schema.Array(Schema.String);
@@ -67,7 +68,6 @@ export function HomeSectionHeading({
   );
 }
 
-/** The first card spans the full width, the rest share two columns on wide screens. */
 export function HomeCardGrid({
   cards,
 }: {
@@ -76,7 +76,10 @@ export function HomeCardGrid({
   return (
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
       {cards.map(({ key, card }, index) => (
-        <div key={key} className={cn("min-w-0", index === 0 && "lg:col-span-2")}>
+        <div
+          key={key}
+          className={cn("min-w-0", homeCardSpansFullWidth(index, cards.length) && "lg:col-span-2")}
+        >
           {card}
         </div>
       ))}

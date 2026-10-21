@@ -5,6 +5,7 @@ import {
   threadRelationshipRowStatus,
   type ThreadRelationshipGraph,
 } from "@t3tools/client-runtime/state/thread-relationships";
+import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
 import { isProviderNativeSubagentThread, type ThreadId } from "@t3tools/contracts";
 
 import { HOME_MAX_CARDS } from "./homeThreads.logic";
@@ -24,6 +25,8 @@ export interface SubagentBoardChild {
   /** Provider-native subagents belong to the provider's conversation; the server rejects messages. */
   readonly readOnly: boolean;
   readonly active: boolean;
+  /** The subagent's status as the Lineage panel reads it, which outlives the child's own turn. */
+  readonly status: string | null;
 }
 
 export interface SubagentBoardSelection {
@@ -58,6 +61,7 @@ export function selectSubagentBoardChildren(
       threadId: row.threadId,
       readOnly: isProviderNativeSubagentThread(thread),
       active: status !== null && !SETTLED_SUBAGENT_STATUSES.has(status),
+      status,
     };
   });
   const ordered = [
@@ -69,4 +73,23 @@ export function selectSubagentBoardChildren(
     children: ordered.slice(0, limit),
     hiddenCount: Math.max(0, ordered.length - limit),
   };
+}
+
+/**
+ * A subagent card's name: the subagent's own title when the provider or delegate gave one (a task
+ * description, a teammate name), else its thread title as the Lineage panel shows it.
+ */
+export function subagentCardTitle(threadTitle: string, subagentTitle: string | null | undefined) {
+  const named = subagentTitle?.trim();
+  return named ? named : formatSubagentDisplayTitle(threadTitle);
+}
+
+export type SubagentStatusTone = "active" | "done" | "failed" | "muted";
+
+/** How a subagent card colours its status; still work is never animated. */
+export function subagentStatusTone(status: string | null): SubagentStatusTone {
+  if (status === "completed") return "done";
+  if (status === "failed" || status === "error") return "failed";
+  if (status === null || SETTLED_SUBAGENT_STATUSES.has(status)) return "muted";
+  return "active";
 }

@@ -409,30 +409,21 @@ export function ThreadRelationshipsPanel(props: {
         hasSubagentChildren || canDetach ? (
           <>
             {hasSubagentChildren ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <ThreadDetailsControl
-                      size="icon-xs"
-                      variant="ghost"
-                      part="icon"
-                      aria-label="Open subagents board"
-                      onClick={() =>
-                        void navigate({
-                          to: "/home",
-                          search: {
-                            parentEnvironmentId: props.environmentId,
-                            parentThreadId: props.threadId,
-                          },
-                        })
-                      }
-                    />
-                  }
-                >
-                  <LayoutGridIcon className="size-3.5" />
-                </TooltipTrigger>
-                <TooltipPopup side="top">Open subagents board</TooltipPopup>
-              </Tooltip>
+              <ThreadDetailsControl
+                part="meta"
+                onClick={() =>
+                  void navigate({
+                    to: "/home",
+                    search: {
+                      parentEnvironmentId: props.environmentId,
+                      parentThreadId: props.threadId,
+                    },
+                  })
+                }
+              >
+                <LayoutGridIcon className="size-3.5" />
+                Subagents
+              </ThreadDetailsControl>
             ) : null}
             {canDetach ? (
               <Menu>

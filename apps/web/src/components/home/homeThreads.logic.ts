@@ -82,3 +82,12 @@ export function latestHomeCardMessages(
   }
   return messages.toReversed();
 }
+
+/**
+ * The first card spans the grid, the rest pair up in two columns, and a card left alone in the
+ * last row spans too instead of leaving half the row empty.
+ */
+export function homeCardSpansFullWidth(index: number, count: number): boolean {
+  if (index === 0) return true;
+  return index === count - 1 && (count - 1) % 2 === 1;
+}

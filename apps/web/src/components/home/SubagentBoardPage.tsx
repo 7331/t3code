@@ -19,7 +19,7 @@ import {
   useCollapsedHomeCards,
 } from "./HomeLayout";
 import { HomeThreadCard } from "./HomeThreadCard";
-import { selectSubagentBoardChildren } from "./subagentBoard.logic";
+import { selectSubagentBoardChildren, subagentCardTitle } from "./subagentBoard.logic";
 
 /** One thread and its subagents as cards, so a fan-out can be watched and steered in one place. */
 export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThreadRef }) {
@@ -43,9 +43,19 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
   const activeCount = children.filter((child) => child.active).length;
   const parentReadOnly = projection !== null && isProviderNativeSubagentThread(projection.thread);
 
+  // Follow-ups add subagent records for the same child; its first titled record names it.
+  const subagentTitles = new Map<string, string>();
+  for (const subagent of projection?.subagents ?? []) {
+    if (subagent.childThreadId === null || !subagent.title) continue;
+    if (!subagentTitles.has(subagent.childThreadId)) {
+      subagentTitles.set(subagent.childThreadId, subagent.title);
+    }
+  }
+
   const cardFor = (
     thread: NonNullable<typeof parent>,
-    readOnly: boolean,
+    role: "parent" | "repliable" | "read-only",
+    subagentStatus?: string | null,
   ): { readonly key: string; readonly card: ReactNode } => {
     const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
     return {
@@ -53,10 +63,20 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
       card: (
         <HomeThreadCard
           thread={thread}
+          title={
+            role === "parent"
+              ? thread.title
+              : subagentCardTitle(thread.title, subagentTitles.get(thread.id))
+          }
           collapsed={collapsed.isCollapsed(key)}
           onToggleCollapsed={() => collapsed.toggle(key)}
           pin={null}
-          readOnly={readOnly}
+          settle={null}
+          readOnly={role === "read-only" || (role === "parent" && parentReadOnly)}
+          {...(subagentStatus === undefined ? {} : { subagentStatus })}
+          replyHint={
+            role === "repliable" ? "Replies go to this subagent; its parent sees the result." : null
+          }
         />
       ),
     };
@@ -118,8 +138,10 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
           />
           <HomeCardGrid
             cards={[
-              cardFor(parent, parentReadOnly),
-              ...children.map((child) => cardFor(child.thread, child.readOnly)),
+              cardFor(parent, "parent"),
+              ...children.map((child) =>
+                cardFor(child.thread, child.readOnly ? "read-only" : "repliable", child.status),
+              ),
             ]}
           />
         </>

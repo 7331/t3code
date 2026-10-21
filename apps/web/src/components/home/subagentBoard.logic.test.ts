@@ -4,7 +4,11 @@ import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
 import { HOME_MAX_CARDS } from "./homeThreads.logic";
-import { selectSubagentBoardChildren } from "./subagentBoard.logic";
+import {
+  selectSubagentBoardChildren,
+  subagentCardTitle,
+  subagentStatusTone,
+} from "./subagentBoard.logic";
 
 const parent = ThreadId.make("parent");
 
@@ -46,8 +50,8 @@ describe("selectSubagentBoardChildren", () => {
     ]);
 
     expect(children).toEqual([
-      { threadId: "delegated", readOnly: false, active: true },
-      { threadId: "native", readOnly: true, active: true },
+      { threadId: "delegated", readOnly: false, active: true, status: "running" },
+      { threadId: "native", readOnly: true, active: true, status: "running" },
     ]);
   });
 
@@ -83,5 +87,35 @@ describe("selectSubagentBoardChildren", () => {
     expect(selection.children).toHaveLength(HOME_MAX_CARDS - 1);
     expect(selection.children[0]?.threadId).toBe(`agent-${total - 1}`);
     expect(selection.hiddenCount).toBe(total - (HOME_MAX_CARDS - 1));
+  });
+});
+
+describe("subagentCardTitle", () => {
+  it("prefers the subagent's own title over its prompt-derived thread title", () => {
+    expect(subagentCardTitle("You are part of a 6-agent team building…", "scaffold")).toBe(
+      "scaffold",
+    );
+  });
+
+  it("falls back to the thread title as the Lineage panel formats it", () => {
+    expect(subagentCardTitle("Subagent: Review the diff", null)).toBe("Review the diff");
+    expect(subagentCardTitle("Reply with ok", "  ")).toBe("Reply with ok");
+  });
+});
+
+describe("subagentStatusTone", () => {
+  it("separates live, finished, failed and stopped subagents", () => {
+    expect(["running", "waiting", "queued"].map(subagentStatusTone)).toEqual([
+      "active",
+      "active",
+      "active",
+    ]);
+    expect(subagentStatusTone("completed")).toBe("done");
+    expect(subagentStatusTone("error")).toBe("failed");
+    expect(["cancelled", "idle", null].map(subagentStatusTone)).toEqual([
+      "muted",
+      "muted",
+      "muted",
+    ]);
   });
 });
