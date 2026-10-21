@@ -50,6 +50,9 @@ const NO_SKILLS: ReadonlyArray<never> = [];
 /** Only feeds the menu hook while the thread's provider is unknown; it then has no skills to list. */
 const FALLBACK_DRIVER_KIND = ProviderDriverKind.make("codex");
 
+/** One line at rest, growing to about six before it scrolls. */
+const HOME_CARD_EDITOR_CLASS = "min-h-0 max-h-[8.5rem]";
+
 /** Pull requests need draft context records the card does not keep, so their menu stays closed. */
 function cardTrigger(candidate: ComposerTrigger | null): ComposerTrigger | null {
   return candidate?.kind === "pull-request" ? null : candidate;
@@ -206,81 +209,75 @@ export function HomeCardComposer({
   };
 
   return (
-    // The card's own reply surface: inset like the messages above, one border, no shadow, and the
-    // thread composer's padding and radius scaled to a card. The menu layer reads the drawer inset.
+    // The card's own reply surface: one row inset like the messages above, one border, no shadow.
+    // The editor grows upward while the picker and send key stay on its last line. The menu layer
+    // reads the drawer inset.
     <div className="px-4 pb-4">
       <div
         ref={setAnchor}
-        className="flex flex-col gap-2 rounded-2xl border border-input bg-background px-3 py-3 [--chat-composer-drawer-inset:0rem]"
+        className="flex items-end gap-1 rounded-3xl border border-input bg-background py-1.5 ps-4 pe-1.5 [--chat-composer-drawer-inset:0rem]"
       >
-        <ComposerPromptEditor
-          draftKey={`home-card:${thread.environmentId}:${thread.id}`}
-          ariaLabel={`Reply to ${thread.title}`}
-          editorRef={editorRef}
-          value={prompt}
-          cursor={cursor}
-          contextRecords={EMPTY_COMPOSER_CONTEXT_RECORDS}
-          skills={skills}
-          disabled={!canOperate}
-          placeholder={
-            canOperate ? `Reply to ${thread.title}` : "This connection can't send messages"
-          }
-          suggestionListId={listId}
-          activeSuggestionId={
-            trigger !== null && activeItem !== null
-              ? composerSuggestionOptionId(listId, activeItem.id)
-              : undefined
-          }
-          className="max-h-40 min-h-6"
-          onChange={(nextValue, nextCursor, expandedCursor, cursorAdjacentToMention) => {
-            setPrompt(threadRef, nextValue);
-            setCursor(nextCursor);
-            setTrigger(
-              cursorAdjacentToMention
-                ? null
-                : cardTrigger(detectComposerTrigger(nextValue, expandedCursor)),
-            );
-          }}
-          onCommandKeyDown={onCommandKeyDown}
-          onPaste={() => undefined}
-        />
-        {/* The picker's own padding is pulled into the gutter so its icon lines up with the text. */}
-        <div className="-ms-2.5 flex min-w-0 items-center gap-2">
-          {entry !== null ? (
-            <ProviderModelPicker
-              environmentId={thread.environmentId}
-              activeInstanceId={instanceId}
-              model={shownModel}
-              lockedProvider={entry.driverKind}
-              instanceEntries={[entry]}
-              modelOptionsByInstance={modelOptions}
-              isComposerOwned
-              disabled={!canOperate}
-              onInstanceModelChange={(nextInstanceId, model) =>
-                setModelSelection(threadRef, createModelSelection(nextInstanceId, model), {
-                  explicit: true,
-                })
-              }
-            />
-          ) : (
-            <span className="truncate px-2.5 text-sm text-muted-foreground">{shownModel}</span>
-          )}
-          {draftHasExtras ? (
-            <span className="truncate text-xs text-muted-foreground">
-              Has attachments · send from the thread
-            </span>
-          ) : null}
-          <ComposerSendButton
-            aria-label="Send"
-            className="ms-auto"
-            disabled={!canSend}
-            onClick={() => void send()}
-          >
-            <ArrowUpIcon className="size-4" />
-          </ComposerSendButton>
+        <div className="min-w-0 flex-1 py-1">
+          <ComposerPromptEditor
+            draftKey={`home-card:${thread.environmentId}:${thread.id}`}
+            ariaLabel={`Reply to ${thread.title}`}
+            editorRef={editorRef}
+            value={prompt}
+            cursor={cursor}
+            contextRecords={EMPTY_COMPOSER_CONTEXT_RECORDS}
+            skills={skills}
+            disabled={!canOperate}
+            placeholder={
+              canOperate ? `Reply to ${thread.title}` : "This connection can't send messages"
+            }
+            suggestionListId={listId}
+            activeSuggestionId={
+              trigger !== null && activeItem !== null
+                ? composerSuggestionOptionId(listId, activeItem.id)
+                : undefined
+            }
+            placeholderClassName="truncate"
+            className={HOME_CARD_EDITOR_CLASS}
+            onChange={(nextValue, nextCursor, expandedCursor, cursorAdjacentToMention) => {
+              setPrompt(threadRef, nextValue);
+              setCursor(nextCursor);
+              setTrigger(
+                cursorAdjacentToMention
+                  ? null
+                  : cardTrigger(detectComposerTrigger(nextValue, expandedCursor)),
+              );
+            }}
+            onCommandKeyDown={onCommandKeyDown}
+            onPaste={() => undefined}
+          />
         </div>
+        {entry !== null ? (
+          <ProviderModelPicker
+            environmentId={thread.environmentId}
+            activeInstanceId={instanceId}
+            model={shownModel}
+            lockedProvider={entry.driverKind}
+            instanceEntries={[entry]}
+            modelOptionsByInstance={modelOptions}
+            isComposerOwned
+            disabled={!canOperate}
+            onInstanceModelChange={(nextInstanceId, model) =>
+              setModelSelection(threadRef, createModelSelection(nextInstanceId, model), {
+                explicit: true,
+              })
+            }
+          />
+        ) : null}
+        <ComposerSendButton aria-label="Send" disabled={!canSend} onClick={() => void send()}>
+          <ArrowUpIcon className="size-4" />
+        </ComposerSendButton>
       </div>
-      {hint ? <p className="px-3 pt-2 text-xs text-muted-foreground">{hint}</p> : null}
+      {draftHasExtras ? (
+        <p className="px-4 pt-2 text-xs text-muted-foreground">
+          This draft has attachments; send it from the thread.
+        </p>
+      ) : null}
+      {hint ? <p className="px-4 pt-2 text-xs text-muted-foreground">{hint}</p> : null}
       {trigger !== null ? (
         <ComposerCommandMenuLayer anchor={anchor}>
           <ComposerCommandMenu
