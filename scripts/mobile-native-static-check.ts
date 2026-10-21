@@ -65,7 +65,7 @@ export class NativeStaticCheckCommandError extends Schema.TaggedError<NativeStat
 
 const kotlinToolCommands = ["ktlint", "detekt"] as const;
 
-export class NativeStaticCheckMissingToolError extends Schema.TaggedErrorClass<NativeStaticCheckMissingToolError>()(
+export class NativeStaticCheckMissingToolError extends Schema.TaggedError<NativeStaticCheckMissingToolError>()(
   "NativeStaticCheckMissingToolError",
   {
     commands: Schema.Array(Schema.Literals(kotlinToolCommands)),

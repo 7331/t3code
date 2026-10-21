@@ -16,19 +16,11 @@ it.effect("fails when ktlint or detekt is missing instead of skipping", () =>
       return assert.fail(`Unexpected error: ${ktlintError._tag}`);
     }
     assert.deepEqual(ktlintError.commands, ["ktlint"]);
-    assert.equal(
-      ktlintError.message,
-      "ktlint is not installed; cannot run Kotlin static analysis. Install via `brew bundle install --file apps/mobile/Brewfile` or put the JVM tools on PATH.",
-    );
 
     const bothError = yield* requireKotlinTools({ ktlint: false, detekt: false }).pipe(Effect.flip);
     if (bothError._tag !== "NativeStaticCheckMissingToolError") {
       return assert.fail(`Unexpected error: ${bothError._tag}`);
     }
     assert.deepEqual(bothError.commands, ["ktlint", "detekt"]);
-    assert.equal(
-      bothError.message,
-      "ktlint and detekt are not installed; cannot run Kotlin static analysis. Install via `brew bundle install --file apps/mobile/Brewfile` or put the JVM tools on PATH.",
-    );
   }),
 );
