@@ -16,6 +16,7 @@ import {
 import { MorphIcon } from "../MorphIcon";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { codeLanguageEntry } from "~/composer-code-languages";
 import { ComposerCodeBlockLanguagePicker } from "./ComposerCodeBlockLanguagePicker";
 import { HighlightedCodeLines } from "./HighlightedCodeLines";
 import { createHighlightCacheKey, estimateHighlightedSize } from "./MarkdownCodeBlock.logic";
@@ -126,7 +127,7 @@ export function MarkdownCodeBlock({
   fenceTitle,
   theme,
   onRunShellCommand,
-  onLanguageChange,
+  languagePicker,
   isStreaming,
   viewToggle,
   canWrap = true,
@@ -138,7 +139,8 @@ export function MarkdownCodeBlock({
   fenceTitle: string | null;
   theme: "light" | "dark";
   onRunShellCommand?: ((command: string) => void) | undefined;
-  onLanguageChange?: ((language: string) => void) | undefined;
+  /** Lets the reader retag the block; shown disabled until the fence closes. */
+  languagePicker?: MarkdownCodeBlockLanguagePicker | undefined;
   isStreaming: boolean;
   viewToggle?: ReactNode;
   canWrap?: boolean;
@@ -154,7 +156,10 @@ export function MarkdownCodeBlock({
   const canRun =
     onRunShellCommand !== undefined &&
     !isStreaming &&
-    /^(?:sh|bash|zsh|fish|shell|powershell|pwsh)$/.test(language) &&
+    // The picker resolves case and aliases ("Bash", "sh"), so Run must agree with what it shows.
+    /^(?:bash|zsh|fish|powershell|pwsh)$/.test(
+      codeLanguageEntry(language)?.id ?? language.toLowerCase(),
+    ) &&
     code.endsWith("\n") &&
     command.length > 0 &&
     !command.endsWith("\\") &&
@@ -239,15 +244,23 @@ export function MarkdownCodeBlock({
       wrapped={wrapped}
       headerProps={THREAD_FIND_IGNORE_PROPS}
       title={
-        // A fence title names the file, which says more than the language.
-        onLanguageChange && !fenceTitle ? (
-          <ComposerCodeBlockLanguagePicker
-            language={language}
-            theme={theme}
-            disabled={false}
-            quietChevron
-            onChange={(next) => onLanguageChange(next || "text")}
-          />
+        languagePicker ? (
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <ComposerCodeBlockLanguagePicker
+              language={language}
+              originalLanguage={languagePicker.originalLanguage}
+              theme={theme}
+              disabled={languagePicker.disabled}
+              quietChevron
+              lazy
+              onChange={(next) => languagePicker.onChange(next || "text")}
+            />
+            {fenceTitle ? (
+              <span className="truncate font-mono text-2xs text-muted-foreground">
+                {fenceTitle}
+              </span>
+            ) : null}
+          </span>
         ) : undefined
       }
       actions={
@@ -297,6 +310,13 @@ export function MarkdownCodeBlock({
       {children}
     </MarkdownCodeBlockFrame>
   );
+}
+
+export interface MarkdownCodeBlockLanguagePicker {
+  /** The fence's own language, so the list can always go back to it. */
+  readonly originalLanguage: string;
+  readonly disabled: boolean;
+  readonly onChange: (language: string) => void;
 }
 
 interface SuspenseShikiCodeBlockProps {

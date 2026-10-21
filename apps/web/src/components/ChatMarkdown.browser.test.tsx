@@ -113,6 +113,19 @@ describe("ChatMarkdown favicon privacy", () => {
   });
 });
 
+/** Opens a code block's language picker and chooses `label`, waiting for the portalled list. */
+async function pickLanguage(trigger: HTMLElement, label: string) {
+  await userEvent.click(trigger);
+  const option = await vi.waitFor(() => {
+    const match = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (candidate) => candidate.textContent === label,
+    );
+    if (!match) throw new Error(`No "${label}" option yet`);
+    return match;
+  });
+  await userEvent.click(option);
+}
+
 describe("ChatMarkdown streaming", () => {
   it("runs only a complete single-line shell block after a click", async () => {
     setup();
@@ -176,28 +189,85 @@ describe("ChatMarkdown streaming", () => {
     await using screen = await render(message(true));
     const { container, rerender } = screen;
     const pickers = () => buttonsLabelled(container, "Code language: Plain text");
-    expect(pickers()).toHaveLength(0);
+    // Shown but disabled while streaming, so the header does not change width when it ends.
+    expect(pickers()[0]?.disabled).toBe(true);
 
     await rerender(message(false));
     expect(buttonsLabelled(container, "Run in terminal")).toHaveLength(0);
-    await act(async () => pickers()[0]!.click());
-    const bash = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-      (option) => option.textContent === "Bash",
-    );
-    await act(async () => bash!.click());
+    await pickLanguage(pickers()[0]!, "Bash");
     await vi.waitFor(() => expect(buttonsLabelled(container, "Run in terminal")).toHaveLength(1));
     expect(container.querySelector('[data-language="bash"]')).not.toBeNull();
 
     await act(async () => buttonsLabelled(container, "Run in terminal")[0]!.click());
     expect(onRunShellCommand).toHaveBeenCalledExactlyOnceWith("echo hello");
 
-    await userEvent.click(buttonsLabelled(container, "Code language: Bash")[0]!);
-    const plain = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-      (option) => option.textContent === "Plain text",
-    );
-    await userEvent.click(plain!);
+    await pickLanguage(buttonsLabelled(container, "Code language: Bash")[0]!, "Plain text");
     await vi.waitFor(() => expect(buttonsLabelled(container, "Run in terminal")).toHaveLength(0));
     expect(container.querySelector('[data-language="text"]')).not.toBeNull();
+  });
+
+  it("keeps an unlisted fence language in the list after a retag", async () => {
+    setup();
+    await using screen = await render(
+      <ChatMarkdown
+        cwd="/tmp/project"
+        text={"```zsh\necho hello\n```"}
+        isStreaming={false}
+        onRunShellCommand={vi.fn()}
+      />,
+    );
+    await pickLanguage(buttonsLabelled(screen.container, "Code language: zsh")[0]!, "Bash");
+    await vi.waitFor(() =>
+      expect(buttonsLabelled(screen.container, "Code language: Bash")).toHaveLength(1),
+    );
+    await pickLanguage(buttonsLabelled(screen.container, "Code language: Bash")[0]!, "zsh");
+    await vi.waitFor(() =>
+      expect(buttonsLabelled(screen.container, "Code language: zsh")).toHaveLength(1),
+    );
+  });
+
+  it("offers Run for a capitalized shell fence, as the picker reads it", async () => {
+    setup();
+    await using screen = await render(
+      <ChatMarkdown
+        cwd="/tmp/project"
+        text={"```Bash\necho hello\n```"}
+        isStreaming={false}
+        onRunShellCommand={vi.fn()}
+      />,
+    );
+    expect(buttonsLabelled(screen.container, "Run in terminal")).toHaveLength(1);
+  });
+
+  it("drops a pick when different code takes the block's place", async () => {
+    setup();
+    const message = (text: string) => (
+      <ChatMarkdown
+        cwd="/tmp/project"
+        text={text}
+        isStreaming={false}
+        onRunShellCommand={vi.fn()}
+      />
+    );
+    await using screen = await render(message("```text\necho one\n```"));
+    await pickLanguage(buttonsLabelled(screen.container, "Code language: Plain text")[0]!, "Bash");
+    await vi.waitFor(() =>
+      expect(buttonsLabelled(screen.container, "Run in terminal")).toHaveLength(1),
+    );
+
+    await screen.rerender(message("```text\necho two\n```"));
+    await vi.waitFor(() =>
+      expect(buttonsLabelled(screen.container, "Run in terminal")).toHaveLength(0),
+    );
+    expect(buttonsLabelled(screen.container, "Code language: Plain text")).toHaveLength(1);
+  });
+
+  it("offers no picker where a retag could not be used", async () => {
+    setup();
+    await using screen = await render(
+      <ChatMarkdown cwd="/tmp/project" text={"```text\necho hello\n```"} isStreaming={false} />,
+    );
+    expect(buttonsLabelled(screen.container, "Code language: Plain text")).toHaveLength(0);
   });
 
   it("edits the current task text and marker after reusing a renderer", async () => {
