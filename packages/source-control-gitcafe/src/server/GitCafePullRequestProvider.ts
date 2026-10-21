@@ -31,7 +31,7 @@ const CAPABILITIES: PullRequestCapabilities = {
   stacks: true,
   stackActions: true,
   reactions: true,
-  labels: false,
+  labels: true,
   // Line comments go through GitCafe's review drafts, which arrive with revision fencing.
   review: {
     inlineComment: false,
@@ -39,7 +39,7 @@ const CAPABILITIES: PullRequestCapabilities = {
     resolve: true,
     verdicts: ["approve", "request-changes", "comment"],
   },
-  reviewers: { request: false, listCandidates: false },
+  reviewers: { request: true, listCandidates: true },
   edit: { changeRequest: true, comment: true },
 };
 
@@ -92,6 +92,10 @@ const Status = Schema.Struct({
     failing: NonNegativeInt,
     total: NonNegativeInt,
   }),
+});
+const Listed = Schema.Struct({
+  items: Schema.Array(Schema.Struct({ id: TrimmedNonEmptyString })),
+  next: Schema.NullOr(Schema.String),
 });
 const FilterOptions = Schema.Struct({
   actors: Schema.Array(
@@ -253,6 +257,39 @@ export const make = Effect.gen(function* () {
         readPages(operation, input, `${path}/comments`, Json.GitCafeComments),
       ),
     );
+
+  /**
+   * GitCafe replaces a pull request's whole reviewer or label list, so one toggle reads the
+   * list, changes it, and writes it back fenced on the pull request's version.
+   */
+  const toggleListed = Effect.fn("GitCafePullRequestProvider.toggleListed")(function* (
+    operation: string,
+    input: PullRef,
+    list: { readonly name: "reviewers" | "labels"; readonly key: "actorIds" | "labelIds" },
+    ids: ReadonlyArray<string>,
+    on: boolean,
+  ) {
+    const path = yield* pullPath(operation, input);
+    const [pull, listed] = yield* Effect.all(
+      [readPull(operation, input), readPages(operation, input, `${path}/${list.name}`, Listed)],
+      { concurrency: 2 },
+    );
+    const current = listed.items.map((item) => item.id);
+    const next = on
+      ? [...new Set([...current, ...ids])]
+      : current.filter((id) => !ids.includes(id));
+    if (next.length === current.length) return;
+    yield* read(
+      operation,
+      input,
+      {
+        method: "PUT",
+        path: `${path}/${list.name}`,
+        body: { expectedVersion: pull.version, [list.key]: next },
+      },
+      Versioned,
+    );
+  });
 
   /**
    * GitCafe's stack lists no heads, and they are what a land or restack is fenced on, so each
@@ -537,7 +574,8 @@ export const make = Effect.gen(function* () {
       const pull = yield* readPull("getChangeRequest", input);
       const path = yield* pullPath("getChangeRequest", input);
       const base = yield* repositoryPath("getChangeRequest", input);
-      const [status, checks, changes] = yield* Effect.all(
+      // A single pull request read carries neither its reviewers nor its labels.
+      const [status, checks, changes, reviewers, labels] = yield* Effect.all(
         [
           read("getChangeRequest", input, { path: `${path}/status` }, Status),
           pull.headOid === null
@@ -551,12 +589,15 @@ export const make = Effect.gen(function* () {
           pull.headOid === null
             ? Effect.succeed(null)
             : readLineStats(input, pull.version).pipe(Effect.orElseSucceed(() => null)),
+          readPages("getChangeRequest", input, `${path}/reviewers`, Json.GitCafeActorEntries),
+          readPages("getChangeRequest", input, `${path}/labels`, Json.GitCafeLabels),
         ],
-        { concurrency: 3 },
+        { concurrency: 5 },
       );
+      const listed = { ...pull, reviewers: reviewers.items, labels: labels.items };
       const permissions = Json.toViewerPermissions(pull);
       return {
-        ...Json.toChangeRequest(pull, input),
+        ...Json.toChangeRequest(listed, input),
         headSha: pull.headOid,
         body: pull.description ?? "",
         ...(pull.sourceRepo === null
@@ -567,7 +608,7 @@ export const make = Effect.gen(function* () {
         changedFiles: changes?.changedFiles ?? 0,
         closedAt: pull.closedAt,
         mergedAt: pull.mergedAt,
-        reviewers: Json.toReviewers(pull, input.host),
+        reviewers: Json.toReviewers(listed, input.host),
         checks: checks === null ? [] : Json.toChecks(checks),
         ...(status.checks.total === 0
           ? {}
@@ -758,12 +799,73 @@ export const make = Effect.gen(function* () {
         Written,
       );
     }),
-    listReviewerCandidates: () =>
-      Effect.fail(
-        failure("listReviewerCandidates", "GitCafe reviewer requests are not supported."),
+    listReviewerCandidates: Effect.fn("GitCafePullRequestProvider.listReviewerCandidates")(
+      function* (input) {
+        const operation = "listReviewerCandidates";
+        const path = yield* pullPath(operation, input);
+        const [pull, candidates, reviewers] = yield* Effect.all(
+          [
+            readPull(operation, input),
+            readPages(operation, input, `${path}/reviewer-candidates`, Json.GitCafeActorEntries),
+            readPages(operation, input, `${path}/reviewers`, Listed),
+          ],
+          { concurrency: 3 },
+        );
+        return {
+          candidates: Json.toReviewerCandidates(candidates, {
+            requested: new Set(reviewers.items.map((reviewer) => reviewer.id)),
+            authorActorId: pull.author.actorId,
+            host: input.host,
+          }),
+          truncated: candidates.next !== null,
+        };
+      },
+    ),
+    setReviewerRequest: (input) =>
+      toggleListed(
+        "setReviewerRequest",
+        input,
+        { name: "reviewers", key: "actorIds" },
+        input.reviewers.map((reviewer) => reviewer.id),
+        input.requested,
       ),
-    setReviewerRequest: () =>
-      Effect.fail(failure("setReviewerRequest", "GitCafe reviewer requests are not supported.")),
+    listLabelCandidates: Effect.fn("GitCafePullRequestProvider.listLabelCandidates")(
+      function* (input) {
+        const operation = "listLabelCandidates";
+        const base = yield* repositoryPath(operation, input);
+        const [labels, applied] = yield* Effect.all(
+          [
+            readPages(operation, input, `${base}/labels`, Json.GitCafeLabels),
+            readPages(operation, input, `${base}/pulls/${input.number}/labels`, Listed),
+          ],
+          { concurrency: 2 },
+        );
+        const appliedIds = new Set(applied.items.map((label) => label.id));
+        return {
+          candidates: labels.items.map((label) => ({
+            name: label.name,
+            color: label.color,
+            description: label.description ?? null,
+            isApplied: appliedIds.has(label.id),
+          })),
+          truncated: labels.next !== null,
+        };
+      },
+    ),
+    setLabels: Effect.fn("GitCafePullRequestProvider.setLabels")(function* (input) {
+      const base = yield* repositoryPath("setLabels", input);
+      const labels = yield* readPages("setLabels", input, `${base}/labels`, Json.GitCafeLabels);
+      const selected = labels.items.filter((label) => input.labels.includes(label.name));
+      if (selected.length !== input.labels.length)
+        return yield* failure("setLabels", "One or more requested labels could not be found.");
+      yield* toggleListed(
+        "setLabels",
+        input,
+        { name: "labels", key: "labelIds" },
+        selected.map((label) => label.id),
+        input.applied,
+      );
+    }),
     replyToThread: Effect.fn("GitCafePullRequestProvider.replyToThread")(function* (input) {
       if (!isId(input.threadId))
         return yield* failure("replyToThread", "GitCafe thread ids are opaque slugs.");

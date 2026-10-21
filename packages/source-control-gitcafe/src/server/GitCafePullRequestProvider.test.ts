@@ -104,6 +104,10 @@ const pull = {
   sourceRepo: null,
   capabilities: { comment: true, review: true, merge: true, edit: true, moderate: true },
 };
+const labels = [
+  { id: "label_bug", name: "bug", color: "#d73a4a", description: null },
+  { id: "label_docs", name: "docs", color: "#0075ca", description: "Documentation" },
+];
 const root = {
   id: "root",
   threadId: "root",
@@ -439,13 +443,15 @@ describe("GitCafePullRequestProvider", () => {
     },
   );
 
-  it.effect("reads line counts, open merge strategies and requested reviewers", () => {
+  it.effect("reads line counts, open merge strategies, reviewers and labels", () => {
     const snapshot = { version: 4, headOid, comparisonBaseOid: baseOid };
     const files = (from: number, count: number) =>
       Array.from({ length: count }, (_, index) => ({ path: `f${from + index}.ts` }));
     let changePage = 0;
     const server = fakeGitCafe({
-      "GET /repos/owner/repo/pulls/7": { ...pull, reviewers: [{ actor }] },
+      "GET /repos/owner/repo/pulls/7": pull,
+      "GET /repos/owner/repo/pulls/7/reviewers": { items: [{ id: "act_one", actor }], next: null },
+      "GET /repos/owner/repo/pulls/7/labels": { items: [labels[0]], next: null },
       "GET /repos/owner/repo/pulls/7/status": {
         merge: {
           conflicts: "unknown",
@@ -501,6 +507,92 @@ describe("GitCafePullRequestProvider", () => {
         detail.reviewers.map((reviewer) => reviewer.login),
         ["alice"],
       );
+      assert.deepStrictEqual(detail.reviewRequestLogins, ["alice"]);
+      assert.deepStrictEqual(detail.labels, [{ name: "bug", color: "#d73a4a" }]);
+    }).pipe(Effect.provide(server.layer));
+  });
+
+  it.effect("requests and withdraws reviewers by rewriting the whole list", () => {
+    const bob = { ...actor, actorId: "act_two", handle: "bob" };
+    let requested = [{ id: "act_two", actor: bob }];
+    const server = fakeGitCafe({
+      "GET /repos/owner/repo/pulls/7": pull,
+      "GET /repos/owner/repo/pulls/7/reviewer-candidates": {
+        items: [
+          { id: "act_one", actor },
+          { id: "act_two", actor: bob },
+          { id: "act_bot", actor: { ...actor, actorId: "act_bot", handle: "lint", bot: true } },
+        ],
+        next: null,
+      },
+      "GET /repos/owner/repo/pulls/7/reviewers": () => ({ items: requested, next: null }),
+      "PUT /repos/owner/repo/pulls/7/reviewers": { version: 5, items: [] },
+    });
+    return Effect.gen(function* () {
+      const provider = yield* GitCafePullRequestProvider.make;
+      const list = yield* provider.listReviewerCandidates(target);
+      // The author, alice, cannot review her own pull request.
+      assert.deepStrictEqual(
+        list.candidates.map((c) => [c.id, c.login, c.isRequested, c.isBot ?? false]),
+        [
+          ["act_two", "bob", true, false],
+          ["act_bot", "lint", false, true],
+        ],
+      );
+
+      const set = (id: string, on: boolean) =>
+        provider.setReviewerRequest({
+          ...target,
+          reviewers: [{ id, kind: "user" }],
+          requested: on,
+        });
+      yield* set("act_bot", true);
+      assert.deepStrictEqual(server.sent.at(-1)?.body, {
+        expectedVersion: 4,
+        actorIds: ["act_two", "act_bot"],
+      });
+      yield* set("act_two", false);
+      assert.deepStrictEqual(server.sent.at(-1)?.body, { expectedVersion: 4, actorIds: [] });
+
+      requested = [];
+      yield* set("act_two", false);
+      assert.strictEqual(server.writes().length, 2);
+    }).pipe(Effect.provide(server.layer));
+  });
+
+  it.effect("applies and removes labels by name through their ids", () => {
+    const server = fakeGitCafe({
+      "GET /repos/owner/repo/pulls/7": pull,
+      "GET /repos/owner/repo/labels": { items: labels, next: null },
+      "GET /repos/owner/repo/pulls/7/labels": { items: [labels[0]], next: null },
+      "PUT /repos/owner/repo/pulls/7/labels": { version: 5, items: [] },
+    });
+    return Effect.gen(function* () {
+      const provider = yield* GitCafePullRequestProvider.make;
+      const list = yield* provider.listLabelCandidates!(target);
+      assert.deepStrictEqual(
+        list.candidates.map((label) => [label.name, label.isApplied]),
+        [
+          ["bug", true],
+          ["docs", false],
+        ],
+      );
+
+      yield* provider.setLabels!({ ...target, labels: ["docs"], applied: true });
+      assert.deepStrictEqual(server.sent.at(-1)?.body, {
+        expectedVersion: 4,
+        labelIds: ["label_bug", "label_docs"],
+      });
+      yield* provider.setLabels!({ ...target, labels: ["bug"], applied: false });
+      assert.deepStrictEqual(server.sent.at(-1)?.body, { expectedVersion: 4, labelIds: [] });
+
+      const missing = yield* provider.setLabels!({
+        ...target,
+        labels: ["nope"],
+        applied: true,
+      }).pipe(Effect.result);
+      assert.strictEqual(missing._tag, "Failure");
+      assert.strictEqual(server.writes().length, 2);
     }).pipe(Effect.provide(server.layer));
   });
 
