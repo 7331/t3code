@@ -327,9 +327,9 @@ if (feature) {
   };
   const program = Effect.gen(function* () {
     yield* Effect.promise(() => release.promise);
-    yield* makeRunOutcomeRecorder(() => Effect.succeed(false))([
-      { sequence: 1, commandId: null, event: runEvent() },
-    ]);
+    const recorder = makeRunOutcomeRecorder(() => Effect.succeed(false));
+    const outcomes = yield* recorder.prepare([{ sequence: 1, commandId: null, event: runEvent() }]);
+    yield* recorder.record(outcomes);
   });
   fiber = Effect.runFork(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
   release.resolve();

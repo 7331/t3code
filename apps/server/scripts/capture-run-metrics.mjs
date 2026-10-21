@@ -16,9 +16,16 @@ const Effect = await load("effect/Effect");
 const Metric = await load("effect/Metric");
 const DateTime = await load("effect/DateTime");
 const feature = NodeFS.existsSync(root + "/apps/server/src/orchestration-v2/RunMetrics.ts");
-const make = feature
+const makeRecorder = feature
   ? (await import(NodeURL.pathToFileURL(root + "/apps/server/src/orchestration-v2/RunMetrics.ts")))
       .makeRunOutcomeRecorder
+  : undefined;
+// Prepare as the EventSink transaction does, then record as its post-commit publication does.
+const make = makeRecorder
+  ? (isSubagent) => {
+      const recorder = makeRecorder(isSubagent);
+      return (batch) => recorder.prepare(batch).pipe(Effect.flatMap(recorder.record));
+    }
   : () => () => Effect.void;
 // Stands in for the projection store: only thread:child has subagent lineage.
 const isSubagentThread = (threadId) => Effect.succeed(threadId === "thread:child");

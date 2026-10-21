@@ -13,8 +13,17 @@ const root = NodePath.resolve(values.root ?? NodePath.resolve(import.meta.dirnam
 const require = NodeModule.createRequire(root + "/apps/server/package.json");
 const load = (s) => import(NodeURL.pathToFileURL(require.resolve(s)).href);
 const local = (s) => import(NodeURL.pathToFileURL(root + "/apps/server/src/" + s + ".ts").href);
-const [Effect, Layer, Metric, DateTime, Stream] = await Promise.all(
-  ["effect/Effect", "effect/Layer", "effect/Metric", "effect/DateTime", "effect/Stream"].map(load),
+const [Effect, Layer, Metric, DateTime, Stream, Option, Fiber, SqlClient] = await Promise.all(
+  [
+    "effect/Effect",
+    "effect/Layer",
+    "effect/Metric",
+    "effect/DateTime",
+    "effect/Stream",
+    "effect/Option",
+    "effect/Fiber",
+    "effect/sql/SqlClient",
+  ].map(load),
 );
 const [Database, EventSink, EventStore, ProjectionStore] = await Promise.all(
   [
@@ -109,8 +118,15 @@ const check = (ss, counts) => {
   }
   NodeAssert.equal(ss.length, feature ? Object.keys(counts).length * 3 : 0);
 };
-const make = feature
+const makeRecorder = feature
   ? (await local("orchestration-v2/RunMetrics")).makeRunOutcomeRecorder
+  : undefined;
+// Prepare as the EventSink transaction does, then record as its post-commit publication does.
+const make = makeRecorder
+  ? (isSubagent) => {
+      const recorder = makeRecorder(isSubagent);
+      return (batch) => recorder.prepare(batch).pipe(Effect.flatMap(recorder.record));
+    }
   : () => () => Effect.void;
 const stored = (r, type = "run.updated") => ({
   sequence: ++seq,
@@ -166,9 +182,11 @@ for (const id of ["H-L01", "H-L02", "H-L03", "H-L04"]) {
       );
       yield* stage([stored({ ...child, id: "run:new" })], { false: 1, true: 1 }, 2);
     } else {
+      // A lookup defect fails preparation, which rolls back the EventSink transaction, so it
+      // reserves nothing and the next commit of the run counts it.
       yield* stage([stored(child)], {}, 1, "Failure");
       mode = "lineage";
-      yield* stage([stored(child)], {}, 1);
+      yield* stage([stored(child)], { true: 1 }, 2);
     }
     return {
       row: id,
@@ -192,6 +210,7 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
   const program = Effect.gen(function* () {
     const es = yield* EventStore.EventStoreV2;
     const ps = yield* ProjectionStore.ProjectionStoreV2;
+    const sql = yield* SqlClient.SqlClient;
     const calls = [],
       order = [],
       inputs = [],
@@ -210,15 +229,45 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
         ...ps,
         getThread: (tid) =>
           Effect.gen(function* () {
-            const durableSequence = yield* es.latestSequence();
-            const durable = yield* ps.getThread(tid);
-            const committedEvents = yield* es
-              .read({ throughSequence: durableSequence })
+            // The lookup runs inside the write transaction, on its connection, before the commit
+            // and the publish lane: the terminal event is visible here but not yet published,
+            // and its run is not yet counted.
+            const inTransaction = Option.isSome(
+              yield* Effect.serviceOption(sql.transactionService),
+            );
+            NodeAssert.ok(inTransaction);
+            const visibleSequence = yield* es.latestSequence();
+            const visible = yield* ps.getThread(tid);
+            const uncommittedEvents = yield* es
+              .read({ throughSequence: visibleSequence })
               .pipe(Stream.runCollect);
-            NodeAssert.equal(committedEvents.at(-1).event.type, "run.updated");
-            NodeAssert.equal(committedEvents.at(-1).event.payload.status, "completed");
-            calls.push({ threadId: tid, inject, durableSequence, durable, committedEvents });
-            order.push({ phase: "lookup", durableSequence, threadId: tid });
+            NodeAssert.equal(uncommittedEvents.at(-1).event.type, "run.updated");
+            NodeAssert.equal(uncommittedEvents.at(-1).event.payload.status, "completed");
+            NodeAssert.ok(
+              !order.some(
+                (o) =>
+                  o.phase === "publishCommitted" &&
+                  o.events.some((e) => e.sequence === visibleSequence),
+              ),
+            );
+            const metricsAtLookup = yield* snapshot;
+            // Each earlier lookup in this row counted exactly one run; this one is not yet counted.
+            NodeAssert.equal(
+              metricsAtLookup
+                .filter((m) => m.id === "t3_runs_total")
+                .reduce((sum, m) => sum + m.state.count, 0),
+              calls.length,
+            );
+            calls.push({
+              threadId: tid,
+              inject,
+              inTransaction,
+              visibleSequence,
+              visible,
+              uncommittedEvents,
+              metricsAtLookup,
+            });
+            order.push({ phase: "lookup", inTransaction, visibleSequence, threadId: tid });
             if (inject)
               return yield* id === "I09-not-found"
                 ? new ProjectionStore.ProjectionStoreThreadNotFoundError({ threadId: tid })
@@ -226,7 +275,7 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
                     threadId: tid,
                     cause: "controlled label read failure",
                   });
-            return durable;
+            return visible;
           }),
       }),
     );
@@ -288,6 +337,13 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
       const live = yield* Effect.promise(() => received.promise);
       NodeAssert.equal(live.event.id, terminal.id);
       order.push({ phase: "write-return", exit: exit._tag });
+      if (feature) {
+        const lookupAt = order.findIndex((o) => o.phase === "lookup");
+        const publishAt = order.findIndex(
+          (o) => o.phase === "publishCommitted" && o.events.some((e) => e.event.id === terminal.id),
+        );
+        NodeAssert.ok(lookupAt >= 0 && lookupAt < publishAt);
+      }
       let ss = yield* snapshot;
       check(ss, { [id === "I07-deleted" ? "true" : "false"]: 1 });
       stages.push(ss);
@@ -334,6 +390,142 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
     Effect.provideService(Metric.MetricRegistry, new Map()),
   );
   result.push(await Effect.runPromise(program));
+}
+// A terminal write pauses in its lineage read while an unrelated writer starts. The read must
+// hold the transaction's connection, before the publish lane, so both writes commit and publish.
+{
+  const phases = [];
+  const mark = (phase) => phases.push(phase);
+  // Reports a stuck ordering instead of hanging; completion, not this timer, is the passing proof.
+  const watchdog = setTimeout(() => {
+    console.error(JSON.stringify({ row: "I10-concurrent-writer", stuck: true, phases }));
+    process.exit(1);
+  }, 30_000);
+  const program = Effect.gen(function* () {
+    const es = yield* EventStore.EventStoreV2;
+    const ps = yield* ProjectionStore.ProjectionStoreV2;
+    const sql = yield* SqlClient.SqlClient;
+    const lookupEntered = Promise.withResolvers();
+    const releaseLookup = Promise.withResolvers();
+    const childId = "thread:concurrent-child";
+    const otherId = "thread:concurrent-other";
+    let armed = false;
+    let inTransaction;
+    const wrapped = Layer.mergeAll(
+      Layer.succeed(EventStore.EventStoreV2, {
+        ...es,
+        publishCommitted: (events) =>
+          Effect.sync(() =>
+            mark("publishCommitted:" + events.map((e) => e.sequence).join(",")),
+          ).pipe(Effect.andThen(es.publishCommitted(events))),
+      }),
+      Layer.succeed(ProjectionStore.ProjectionStoreV2, {
+        ...ps,
+        getThread: (tid) =>
+          Effect.gen(function* () {
+            if (armed && tid === childId) {
+              armed = false;
+              inTransaction = Option.isSome(yield* Effect.serviceOption(sql.transactionService));
+              mark("lookup-entered:inTransaction=" + inTransaction);
+              lookupEntered.resolve();
+              // Outside a transaction this pause is the reviewer's deadlock, so only pause inside.
+              if (inTransaction) yield* Effect.promise(() => releaseLookup.promise);
+              mark("lookup-released");
+            }
+            return yield* ps.getThread(tid);
+          }),
+      }),
+    );
+    return yield* Effect.gen(function* () {
+      const sink = yield* EventSink.EventSinkV2;
+      const child = {
+        ...thread,
+        id: childId,
+        lineage: {
+          parentThreadId: threadId,
+          relationshipToParent: "subagent",
+          rootThreadId: threadId,
+        },
+      };
+      const other = {
+        ...thread,
+        id: otherId,
+        lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: otherId },
+      };
+      const r = { ...run, id: "run:concurrent", threadId: childId };
+      const ev = (type, payload) => ({
+        ...event(type, payload),
+        threadId: payload.threadId ?? payload.id,
+      });
+      yield* sink.write({
+        events: [
+          event("thread.created", thread),
+          ev("thread.created", child),
+          ev("run.created", { ...r, status: "running", completedAt: null }),
+        ],
+      });
+      const beforeSequence = yield* es.latestSequence();
+      const terminal = ev("run.updated", r);
+      const unrelated = ev("thread.created", other);
+      const ready = Promise.withResolvers();
+      const received = new Map([
+        [terminal.id, Promise.withResolvers()],
+        [unrelated.id, Promise.withResolvers()],
+      ]);
+      yield* sink.stream({ afterSequence: 0 }).pipe(
+        Stream.runForEach((e) =>
+          Effect.sync(() => {
+            if (e.sequence === beforeSequence) ready.resolve();
+            received.get(e.event.id)?.resolve(e);
+          }),
+        ),
+        Effect.forkScoped,
+      );
+      yield* Effect.promise(() => ready.promise);
+      armed = feature;
+      const terminalFiber = yield* sink.write({ events: [terminal] }).pipe(Effect.forkScoped);
+      if (feature) {
+        yield* Effect.promise(() => lookupEntered.promise);
+        NodeAssert.ok(inTransaction, "lineage read ran outside the write transaction");
+      }
+      mark("unrelated-write-requested");
+      const unrelatedFiber = yield* sink.write({ events: [unrelated] }).pipe(Effect.forkScoped);
+      releaseLookup.resolve();
+      const terminalStored = yield* Fiber.join(terminalFiber);
+      mark("terminal-write-returned");
+      const unrelatedStored = yield* Fiber.join(unrelatedFiber);
+      mark("unrelated-write-returned");
+      const live = yield* Effect.promise(() =>
+        Promise.all([...received.values()].map((d) => d.promise)),
+      );
+      mark("both-published-live");
+      const ss = yield* snapshot;
+      check(ss, { true: 1 });
+      return {
+        row: "I10-concurrent-writer",
+        sha,
+        feature,
+        route: "HARNESS CAPTURE / real EventSink + SQLite, concurrent writers",
+        inputs: [[terminal], [unrelated]],
+        inTransaction,
+        phases,
+        receipts: {
+          terminal: terminalStored.map((e) => e.sequence),
+          unrelated: unrelatedStored.map((e) => e.sequence),
+          live: live.map((e) => [e.sequence, e.event.type]),
+        },
+        before: [],
+        after: ss,
+        status: feature ? "passed" : "absent instrument",
+      };
+    }).pipe(Effect.provide(EventSink.layer.pipe(Layer.provide(wrapped), Layer.provide(stores))));
+  }).pipe(
+    Effect.provide(stores),
+    Effect.scoped,
+    Effect.provideService(Metric.MetricRegistry, new Map()),
+  );
+  result.push(await Effect.runPromise(program));
+  clearTimeout(watchdog);
 }
 // Execute the continuation and downstream blocks from the frozen capture source itself.
 {
