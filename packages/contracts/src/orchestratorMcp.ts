@@ -367,15 +367,11 @@ export const OrchestratorMcpThreadListResult = Schema.Struct({
 });
 export type OrchestratorMcpThreadListResult = typeof OrchestratorMcpThreadListResult.Type;
 
-/**
- * Codex drops `minimum` and `maximum` from the declaration it shows the model, so it cannot see
- * these bounds and a rejected call only costs a retry. The description carries the bound instead,
- * and a larger value clamps on decode (the advertised schema therefore has no such maximum).
- * Values below 1 still fail: 0 asks for nothing, and answering it with one item would be a
- * different request.
- */
-const clampedPositiveInt = (maximum: number, description: string) =>
-  PositiveInt.annotate({ description }).pipe(
+// Codex hides `minimum` and `maximum` from the model, so a value above the maximum clamps on
+// decode instead of failing the call; pagination returns the rest. Values below 1 still fail:
+// 0 asks for nothing, and answering it with one item would be a different request.
+const clampedPositiveInt = (maximum: number) =>
+  PositiveInt.pipe(
     Schema.decodeTo(
       PositiveInt.check(Schema.isLessThanOrEqualTo(maximum)),
       SchemaTransformation.transform({
@@ -391,21 +387,9 @@ export const OrchestratorMcpThreadReadInput = Schema.Struct({
   textOffset: Schema.optional(NonNegativeInt),
   view: Schema.optional(Schema.Literals(["messages", "activity"])),
   afterPosition: Schema.optional(NonNegativeInt),
-  limit: Schema.optional(
-    clampedPositiveInt(
-      100,
-      "Timeline items per page, 1 to 100. Larger values are clamped to 100; continue with afterPosition=nextPosition.",
-    ),
-  ),
-  runLimit: Schema.optional(
-    clampedPositiveInt(50, "Recent runs to include, 1 to 50. Larger values are clamped to 50."),
-  ),
-  maxCharsPerItem: Schema.optional(
-    clampedPositiveInt(
-      50_000,
-      "Characters of text per timeline item, 1 to 50000. Larger values are clamped to 50000; recover the rest with itemId and textOffset=nextTextOffset.",
-    ),
-  ),
+  limit: Schema.optional(clampedPositiveInt(100)),
+  runLimit: Schema.optional(clampedPositiveInt(50)),
+  maxCharsPerItem: Schema.optional(clampedPositiveInt(50_000)),
 });
 export type OrchestratorMcpThreadReadInput = typeof OrchestratorMcpThreadReadInput.Type;
 

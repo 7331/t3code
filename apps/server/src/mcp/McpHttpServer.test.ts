@@ -422,21 +422,6 @@ it.effect.each(["limit", "runLimit", "maxCharsPerItem"])(
   },
 );
 
-it.effect("tells the model each t3_thread_read page-size bound in the field description", () =>
-  Effect.gen(function* () {
-    const server = yield* McpServer.McpServer;
-    const schema = server.tools.find(({ tool }) => tool.name === "t3_thread_read")?.tool
-      .inputSchema as { properties?: Record<string, unknown> } | undefined;
-    const advertised = (field: string) => JSON.stringify(schema?.properties?.[field]);
-
-    expect(advertised("limit")).toContain("1 to 100. Larger values are clamped to 100");
-    expect(advertised("runLimit")).toContain("1 to 50. Larger values are clamped to 50");
-    expect(advertised("maxCharsPerItem")).toContain(
-      "1 to 50000. Larger values are clamped to 50000",
-    );
-  }).pipe(Effect.provide(layerRecordingTools([]))),
-);
-
 it.effect(
   "registers the pull request toolkit and surfaces a missing capability as a tool error",
   () =>
