@@ -64,7 +64,7 @@ type CodexRateLimitsProbe =
       readonly resetCredits: CodexResetCreditsSummary | null | undefined;
       readonly accountId?: string | null | undefined;
     }
-  | { readonly failure: string };
+  | { readonly failure: string; readonly code?: number };
 
 const CODEX_APP_SERVER_PROBE_FORCE_KILL_AFTER = "2 seconds" as const;
 const CODEX_CATALOG_REFRESH_TIMEOUT_MS = 3_000;
@@ -584,7 +584,10 @@ const probeCodexAppServerProvider = Effect.fn("probeCodexAppServerProvider")(fun
             ),
             Effect.catch((error) =>
               Effect.logDebug("Codex rate-limit read failed.", { cause: error }).pipe(
-                Effect.as<CodexRateLimitsProbe>({ failure: codexRateLimitsFailureMessage(error) }),
+                Effect.as<CodexRateLimitsProbe>({
+                  failure: codexRateLimitsFailureMessage(error),
+                  ...(error._tag === "CodexAppServerRequestError" ? { code: error.code } : {}),
+                }),
               ),
             ),
           ),
@@ -791,7 +794,11 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
     : accountProbeStatus(snapshot);
   const usageLimits =
     snapshot.account.account?.type === "apiKey" ||
-    (snapshot.account.account === null && !snapshot.account.requiresOpenaiAuth)
+    (snapshot.account.account === null &&
+      !snapshot.account.requiresOpenaiAuth &&
+      snapshot.rateLimits !== undefined &&
+      "failure" in snapshot.rateLimits &&
+      snapshot.rateLimits.code === -32600)
       ? makeUnavailableUsageLimits({ checkedAt, reason: "unsupported" })
       : snapshot.rateLimits === undefined || "failure" in snapshot.rateLimits
         ? makeUnavailableUsageLimits({

@@ -383,7 +383,10 @@ it.layer(
           Effect.succeed(
             makeCodexProbeSnapshot({
               account: { account: null, requiresOpenaiAuth: false },
-              rateLimits: { failure: "Codex could not read usage (JSON-RPC -32600)." },
+              rateLimits: {
+                failure: "Codex could not read usage (JSON-RPC -32600).",
+                code: -32600,
+              },
             }),
           ),
         );
@@ -401,12 +404,10 @@ it.layer(
 
     it.effect("retains native usage failures for ChatGPT subscriptions", () =>
       Effect.gen(function* () {
-        for (const message of [
-          "Codex could not read usage (JSON-RPC -32600).",
-          "Codex could not read usage (JSON-RPC -32603).",
-        ]) {
+        for (const code of [-32600, -32603]) {
+          const message = `Codex could not read usage (JSON-RPC ${code}).`;
           const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
-            Effect.succeed(makeCodexProbeSnapshot({ rateLimits: { failure: message } })),
+            Effect.succeed(makeCodexProbeSnapshot({ rateLimits: { failure: message, code } })),
           );
 
           expect(status.auth.type).toBe("chatgpt");
@@ -447,6 +448,61 @@ it.layer(
           ],
         });
       }),
+    );
+
+    it.effect("retains successful native usage when a custom provider reports no account", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
+          Effect.succeed(
+            makeCodexProbeSnapshot({
+              account: { account: null, requiresOpenaiAuth: false },
+              rateLimits: {
+                snapshot: { primary: { usedPercent: 12, windowDurationMins: 300 } },
+                resetCredits: undefined,
+              },
+            }),
+          ),
+        );
+
+        expect(status.usageLimits).toEqual({
+          checkedAt: status.checkedAt,
+          windows: [
+            {
+              id: "primary",
+              kind: "session",
+              label: "Session",
+              usedPercent: 12,
+              windowDurationMins: 300,
+            },
+          ],
+        });
+      }),
+    );
+
+    it.effect(
+      "retains genuine native usage failures when a custom provider reports no account",
+      () =>
+        Effect.gen(function* () {
+          for (const rateLimits of [
+            { failure: "Codex could not read usage (JSON-RPC -32603).", code: -32603 },
+            { failure: "Codex did not answer the usage request." },
+          ]) {
+            const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
+              Effect.succeed(
+                makeCodexProbeSnapshot({
+                  account: { account: null, requiresOpenaiAuth: false },
+                  rateLimits,
+                }),
+              ),
+            );
+
+            expect(status.usageLimits).toEqual({
+              checkedAt: status.checkedAt,
+              windows: [],
+              unavailable: { reason: "probeFailed", message: rateLimits.failure },
+            });
+          }
+        }),
     );
 
     it.effect("returns unauthenticated when app-server requires OpenAI auth", () =>
