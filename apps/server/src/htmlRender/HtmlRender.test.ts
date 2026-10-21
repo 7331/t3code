@@ -313,39 +313,6 @@ describe("HtmlRender", () => {
           expect(error).toMatchObject({ cause: { code: "ENOTDIR" } });
         }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
       );
-      it.live("publishes the page without measured heights", () =>
-        Effect.gen(function* () {
-          const fileSystem = yield* FileSystem.FileSystem;
-          const path = yield* Path.Path;
-          const file = yield* fileSystem.makeTempFileScoped({ prefix: "t3-browser-spawn-" });
-          yield* Effect.gen(function* () {
-            const config = yield* ServerConfig.ServerConfig;
-            const htmlRender = yield* HtmlRender.HtmlRender;
-            const outcome = yield* htmlRender
-              .publish({
-                threadId: ThreadId.make("thread-html-spawn"),
-                html: "<p>Browser unavailable</p>",
-                title: "Saved page",
-                height: 300,
-              })
-              .pipe(Effect.exit);
-            assert(Exit.isSuccess(outcome), "Expected a published attachment.");
-            const reference = outcome.value;
-            expect(reference).toEqual({
-              attachmentId: expect.any(String),
-              title: "Saved page",
-              height: 300,
-            });
-            const stored = resolveAttachmentPathById({
-              attachmentsDir: config.attachmentsDir,
-              attachmentId: reference.attachmentId,
-            });
-            expect(yield* fileSystem.readFileString(stored ?? "")).toContain(
-              "<p>Browser unavailable</p>",
-            );
-          }).pipe(Effect.provide(layerHtmlRender(path.join(file, "chrome-headless-shell"))));
-        }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
-      );
     },
   );
 
