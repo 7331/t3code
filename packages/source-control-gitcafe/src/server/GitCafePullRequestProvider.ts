@@ -391,9 +391,10 @@ export const make = Effect.gen(function* () {
     const key = `${input.host} ${input.repository.toLowerCase()} ${input.number} ${revision.baseOid} ${revision.headOid}`;
     const held = lineTotals.get(key);
     if (held !== undefined) return { changedFiles: files.length, ...held };
-    const details =
-      files.some((file) => file.additions !== undefined) || files.length > LINE_STATS_MAX_FILES
-        ? Option.some(files)
+    const details = files.some((file) => file.additions !== undefined)
+      ? Option.some(files)
+      : files.length > LINE_STATS_MAX_FILES
+        ? Option.none()
         : yield* Effect.forEach(
             chunk(detailablePaths(files), DIFF_FILES_BATCH),
             (paths) => readDiffFiles(input, revision, paths),
