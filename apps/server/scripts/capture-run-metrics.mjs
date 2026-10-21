@@ -227,9 +227,33 @@ for (const r of rows) {
     let record = make(isSubagentThread);
     const before = yield* Metric.snapshot;
     const stages = [];
+    const preparations = [];
+    const fifoCalls = [];
+    const fifo =
+      r.id === "D13"
+        ? makeRecorder?.((tid) => {
+            fifoCalls.push(tid);
+            return isSubagentThread(tid);
+          })
+        : undefined;
     for (const [i, batch] of r.batches.entries()) {
       if (r.reset && i) record = make(isSubagentThread);
-      yield* record(batch);
+      if (fifo) {
+        const beforePrepare = (yield* Metric.snapshot).filter((s) => s.id.startsWith("t3_run"));
+        const outcomes = yield* fifo.prepare(batch);
+        NodeAssert.equal(outcomes.length, batch.length);
+        NodeAssert.equal(fifoCalls.length, i + 1);
+        NodeAssert.deepEqual(
+          (yield* Metric.snapshot).filter((s) => s.id.startsWith("t3_run")),
+          beforePrepare,
+        );
+        preparations.push({
+          length: outcomes.length,
+          calls: [...fifoCalls],
+          metrics: beforePrepare,
+        });
+        yield* fifo.record(outcomes);
+      } else yield* record(batch);
       stages.push((yield* Metric.snapshot).filter((s) => s.id.startsWith("t3_run")));
     }
     const after = stages.at(-1);
@@ -264,6 +288,7 @@ for (const r of rows) {
       before,
       after,
       stages,
+      preparations,
       totals,
       units: { counter: "1", queue: "milliseconds", duration: "milliseconds" },
       status: "passed",

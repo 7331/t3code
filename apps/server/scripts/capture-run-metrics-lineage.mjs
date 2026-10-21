@@ -532,6 +532,334 @@ for (const id of ["I07-deleted", "I08-read-error", "I09-not-found"]) {
   result.push(await Effect.runPromise(program));
   clearTimeout(watchdog);
 }
+
+for (const id of [
+  "D13-uncounted-same-batch",
+  "H-P01-concurrent-prepared-duplicate",
+  "H-P02-thread-cache",
+]) {
+  const program = Effect.gen(function* () {
+    const calls = [],
+      stages = [],
+      inputs = [];
+    let mode = "lineage";
+    const recorder = makeRecorder?.((tid) =>
+      Effect.suspend(() => {
+        calls.push({ tid, mode });
+        return mode === "die"
+          ? Effect.die("record performed lookup")
+          : mode === "fail"
+            ? Effect.fail("typed cache failure")
+            : Effect.succeed(tid === "thread:child" || mode === "true");
+      }),
+    );
+    const prepare = function* (batch) {
+      inputs.push(batch);
+      const before = yield* snapshot;
+      const outcomes = recorder ? yield* recorder.prepare(batch) : [];
+      NodeAssert.deepEqual(yield* snapshot, before);
+      stages.push({
+        phase: "prepare",
+        length: outcomes.length,
+        calls: [...calls],
+        metrics: before,
+      });
+      if (feature) NodeAssert.equal(outcomes.length, batch.length);
+      return outcomes;
+    };
+    const record = function* (outcomes, expected) {
+      if (recorder) yield* recorder.record(outcomes);
+      const ss = yield* snapshot;
+      check(ss, expected);
+      stages.push({ phase: "record", calls: [...calls], metrics: ss });
+    };
+    if (id === "D13-uncounted-same-batch") {
+      const x = stored({ ...run, id: "fifo:X" });
+      const batch = [
+        x,
+        ...Array.from({ length: 4096 }, (_, i) => stored({ ...run, id: "fifo:" + i })),
+        x,
+        x,
+      ];
+      const prepared = yield* prepare(batch);
+      NodeAssert.equal(calls.length, feature ? 1 : 0);
+      yield* record(prepared, { false: 4098 });
+    } else if (id === "H-P01-concurrent-prepared-duplicate") {
+      for (const reverse of [false, true]) {
+        // Each record order owns a fresh registry and recorder.
+        yield* Effect.gen(function* () {
+          const localCalls = [];
+          let forbidden = false;
+          const rec = makeRecorder?.((tid) =>
+            Effect.suspend(() => {
+              localCalls.push(tid);
+              return forbidden
+                ? Effect.die("record lookup")
+                : Effect.succeed(tid === "thread:child");
+            }),
+          );
+          const a = stored({ ...run, id: "prepared:X" });
+          const b = stored({
+            ...run,
+            id: "prepared:X",
+            threadId: "thread:child",
+            requestedAt: at(-30),
+            startedAt: at(0),
+            completedAt: at(600),
+          });
+          inputs.push([a], [b]);
+          const abandoned = rec ? yield* rec.prepare([stored({ ...run, id: "abandoned" })]) : [];
+          const aa = rec ? yield* rec.prepare([a]) : [],
+            bb = rec ? yield* rec.prepare([b]) : [];
+          check(yield* snapshot, {});
+          if (feature) NodeAssert.deepEqual([abandoned.length, aa.length, bb.length], [1, 1, 1]);
+          stages.push({
+            reverse,
+            phase: "prepared",
+            aa,
+            bb,
+            abandoned,
+            calls: [...localCalls],
+            metrics: yield* snapshot,
+          });
+          forbidden = true;
+          for (const outcomes of reverse ? [bb, aa] : [aa, bb]) {
+            if (rec) yield* rec.record(outcomes);
+            const ss = yield* snapshot;
+            check(ss, { [reverse ? "true" : "false"]: 1 });
+            stages.push({ reverse, phase: "record", metrics: ss, calls: [...localCalls] });
+          }
+          // Abandonment did not reserve this ID; recording its later preparation counts it.
+          forbidden = false;
+          const retry = rec ? yield* rec.prepare([stored({ ...run, id: "abandoned" })]) : [];
+          forbidden = true;
+          if (rec) yield* rec.record(retry);
+          check(yield* snapshot, reverse ? { true: 1, false: 1 } : { false: 2 });
+          stages.push({
+            reverse,
+            phase: "abandoned-retry",
+            metrics: yield* snapshot,
+            calls: [...localCalls],
+          });
+        }).pipe(Effect.provideService(Metric.MetricRegistry, new Map()));
+      }
+    } else {
+      let n = 0;
+      const fresh = (tid, explicit = false) =>
+        stored({
+          ...run,
+          id: "cache:" + ++n,
+          threadId: tid,
+          ...(explicit ? { delegatedTaskId: "explicit" } : {}),
+        });
+      const batches = [
+        [fresh("root"), fresh("root")],
+        [fresh("thread:child"), fresh("thread:child")],
+        [fresh("new-root", true), fresh("new-root"), fresh("new-root")],
+        [fresh("error"), fresh("error")],
+        [fresh("error")],
+      ];
+      batches[0].push(batches[0][0]);
+      const expected = [
+        { false: 2 },
+        { false: 2, true: 2 },
+        { false: 4, true: 3 },
+        { false: 6, true: 3 },
+        { false: 6, true: 4 },
+      ];
+      for (let i = 0; i < batches.length; i++) {
+        mode = i === 3 ? "fail" : i === 4 ? "true" : "lineage";
+        const outcomes = yield* prepare(batches[i]);
+        NodeAssert.equal(calls.length, feature ? i + 1 : 0);
+        yield* record(outcomes, expected[i]);
+      }
+    }
+    return {
+      row: id,
+      sha,
+      feature,
+      route: "HARNESS CAPTURE / staged production recorder",
+      inputs,
+      stages,
+      calls,
+      before: [],
+      after: yield* snapshot,
+      status: feature ? "passed" : "absent instrument",
+    };
+  }).pipe(Effect.provideService(Metric.MetricRegistry, new Map()));
+  result.push(await Effect.runPromise(program));
+}
+{
+  const [Outbox, Receipts, Projects, Positions] = await Promise.all(
+    [
+      "orchestration-v2/EffectOutbox",
+      "orchestration-v2/CommandReceiptStore",
+      "orchestration-v2/ProjectStore",
+      "orchestration-v2/TurnItemPositionStore",
+    ].map(local),
+  );
+  const extra = Layer.mergeAll(Outbox.layer, Receipts.layer, Projects.layer, Positions.layer).pipe(
+    Layer.provide(db),
+  );
+  const program = Effect.gen(function* () {
+    const es = yield* EventStore.EventStoreV2,
+      ps = yield* ProjectionStore.ProjectionStoreV2,
+      sql = yield* SqlClient.SqlClient;
+    const outbox = yield* Outbox.EffectOutboxV2;
+    const order = [],
+      stages = [],
+      inputs = [];
+    let mode = "seed";
+    const wrapped = Layer.mergeAll(
+      Layer.succeed(EventStore.EventStoreV2, {
+        ...es,
+        publishCommitted: (events) =>
+          Effect.sync(() => order.push({ phase: "publish", events })).pipe(
+            Effect.andThen(es.publishCommitted(events)),
+          ),
+      }),
+      Layer.succeed(ProjectionStore.ProjectionStoreV2, {
+        ...ps,
+        getThread: (tid) =>
+          Effect.gen(function* () {
+            const transaction = Option.isSome(yield* Effect.serviceOption(sql.transactionService));
+            NodeAssert.ok(transaction);
+            check(yield* snapshot, {});
+            order.push({ phase: "lookup", tid, mode, transaction, metrics: yield* snapshot });
+            if (mode === "defect" && tid === "rollback:B")
+              return yield* Effect.die("partial preparation defect");
+            return yield* ps.getThread(tid);
+          }),
+      }),
+      Layer.succeed(Outbox.EffectOutboxV2, {
+        ...outbox,
+        enqueue: (effects) =>
+          Effect.gen(function* () {
+            order.push({ phase: "outbox", mode });
+            if (mode === "outbox") return yield* Effect.fail("after successful prepare");
+            return yield* outbox.enqueue(effects);
+          }),
+      }),
+    );
+    return yield* Effect.gen(function* () {
+      const sink = yield* EventSink.EventSinkV2;
+      const rr = ["A", "B"].map((x) => ({
+        ...run,
+        id: "rollback:" + x,
+        threadId: "rollback:" + x,
+      }));
+      const ev = (type, payload) => ({
+        ...event(type, payload),
+        threadId: payload.threadId ?? payload.id,
+      });
+      const seed = rr.flatMap((r) => [
+        ev("thread.created", {
+          ...thread,
+          id: r.threadId,
+          lineage: {
+            parentThreadId: threadId,
+            relationshipToParent: "subagent",
+            rootThreadId: threadId,
+          },
+        }),
+        ev("run.created", { ...r, status: "running", completedAt: null }),
+      ]);
+      yield* sink.write({ events: seed });
+      const beforeSequence = yield* es.latestSequence();
+      const state = () =>
+        Effect.gen(function* () {
+          return {
+            sequence: yield* es.latestSequence(),
+            threads: yield* Effect.all(rr.map((r) => ps.getThread(r.threadId))),
+          };
+        });
+      const beforeState = yield* state();
+      const ready = Promise.withResolvers(),
+        liveDone = Promise.withResolvers(),
+        live = [];
+      yield* sink.stream({ afterSequence: 0 }).pipe(
+        Stream.runForEach((e) =>
+          Effect.sync(() => {
+            if (e.sequence === beforeSequence) ready.resolve();
+            if (e.event.type === "run.updated") {
+              live.push(e);
+              if (live.length === 2) liveDone.resolve();
+            }
+          }),
+        ),
+        Effect.forkScoped,
+      );
+      yield* Effect.promise(() => ready.promise);
+      const publications = () =>
+        order.filter(
+          (o) => o.phase === "publish" && o.events.some((e) => e.event.type === "run.updated"),
+        );
+      for (const next of ["outbox", "defect", "retry"]) {
+        mode = next;
+        const batch = rr.map((r) => ev("run.updated", r));
+        inputs.push(batch);
+        const start = order.length;
+        const exit = yield* Effect.exit(sink.writeWithEffects({ events: batch, effects: [] }));
+        const trace = order.slice(start);
+        if (next !== "retry") {
+          NodeAssert.equal(exit._tag, "Failure");
+          NodeAssert.deepEqual(yield* state(), beforeState);
+          check(yield* snapshot, {});
+          NodeAssert.equal(publications().length, 0);
+          NodeAssert.equal(live.length, 0);
+          if (feature) NodeAssert.equal(trace.filter((o) => o.phase === "lookup").length, 2);
+          if (next === "outbox") NodeAssert.equal(trace.at(-1).phase, "outbox");
+          else if (feature) NodeAssert.ok(!trace.some((o) => o.phase === "outbox"));
+        } else {
+          NodeAssert.equal(exit._tag, "Success");
+          yield* Effect.promise(() => liveDone.promise);
+          check(yield* snapshot, { true: 2 });
+          NodeAssert.equal(live.length, 2);
+          NodeAssert.equal(publications().length, 1);
+        }
+        stages.push({
+          phase: next,
+          exit: exit._tag,
+          cause: exit._tag === "Failure" ? String(exit.cause) : null,
+          trace,
+          sql: yield* state(),
+          metrics: yield* snapshot,
+          live: [...live],
+        });
+      }
+      return {
+        row: "I11-rollback-after-prepare",
+        sha,
+        feature,
+        route: "HARNESS CAPTURE / real EventSink SQLite outbox rollback",
+        inputs,
+        beforeState,
+        stages,
+        order,
+        before: [],
+        after: yield* snapshot,
+        status: feature ? "passed" : "absent instrument",
+      };
+    }).pipe(Effect.provide(EventSink.layerFromStores.pipe(Layer.provide(wrapped))));
+  }).pipe(
+    Effect.provide(extra),
+    Effect.provide(stores),
+    Effect.scoped,
+    Effect.provideService(Metric.MetricRegistry, new Map()),
+  );
+  if (feature) result.push(await Effect.runPromise(program));
+  else
+    result.push({
+      row: "I11-rollback-after-prepare",
+      sha,
+      feature,
+      route: "HARNESS CAPTURE / baseline has no preparation boundary",
+      before: [],
+      after: [],
+      status: "absent instrument",
+    });
+}
+
 // Execute the continuation and downstream blocks from the frozen capture source itself.
 {
   const source = NodeFS.readFileSync(
