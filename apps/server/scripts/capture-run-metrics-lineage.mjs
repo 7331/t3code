@@ -101,7 +101,7 @@ const snapshot = Metric.snapshot.pipe(
 );
 const result = [];
 const crypto = await import("node:crypto");
-const check = (ss, counts) => {
+const check = (ss, counts, timerMultipliers = {}) => {
   for (const [delegated, count] of Object.entries(feature ? counts : {})) {
     const matching = ss.filter((s) => s.attributes.delegated === delegated);
     NodeAssert.equal(matching.length, 3);
@@ -112,7 +112,12 @@ const check = (ss, counts) => {
       NodeAssert.equal(s.state.count, count);
       if (s.id !== "t3_runs_total") {
         NodeAssert.equal(s.attributes.time_unit, "milliseconds");
-        NodeAssert.equal(s.state.sum, count * (s.id === "t3_run_queue_wait" ? 30000 : 600000));
+        NodeAssert.equal(
+          s.state.sum,
+          count *
+            (timerMultipliers[delegated] ?? 1) *
+            (s.id === "t3_run_queue_wait" ? 30000 : 600000),
+        );
       }
     }
   }
@@ -603,9 +608,9 @@ for (const id of [
             ...run,
             id: "prepared:X",
             threadId: "thread:child",
-            requestedAt: at(-30),
-            startedAt: at(0),
-            completedAt: at(600),
+            requestedAt: at(0),
+            startedAt: at(60),
+            completedAt: at(1260),
           });
           inputs.push([a], [b]);
           const abandoned = rec ? yield* rec.prepare([stored({ ...run, id: "abandoned" })]) : [];
@@ -626,7 +631,7 @@ for (const id of [
           for (const outcomes of reverse ? [bb, aa] : [aa, bb]) {
             if (rec) yield* rec.record(outcomes);
             const ss = yield* snapshot;
-            check(ss, { [reverse ? "true" : "false"]: 1 });
+            check(ss, { [reverse ? "true" : "false"]: 1 }, { true: 2 });
             stages.push({ reverse, phase: "record", metrics: ss, calls: [...localCalls] });
           }
           // Abandonment did not reserve this ID; recording its later preparation counts it.
@@ -634,7 +639,7 @@ for (const id of [
           const retry = rec ? yield* rec.prepare([stored({ ...run, id: "abandoned" })]) : [];
           forbidden = true;
           if (rec) yield* rec.record(retry);
-          check(yield* snapshot, reverse ? { true: 1, false: 1 } : { false: 2 });
+          check(yield* snapshot, reverse ? { true: 1, false: 1 } : { false: 2 }, { true: 2 });
           stages.push({
             reverse,
             phase: "abandoned-retry",
