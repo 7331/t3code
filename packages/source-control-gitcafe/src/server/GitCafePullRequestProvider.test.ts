@@ -52,9 +52,11 @@ function fakeGitCafe(
       const response =
         route === undefined
           ? new Response(encodeJson({ type: "https://cafe.sh/errors/not-found" }), { status: 404 })
-          : new Response(encodeJson(typeof route === "function" ? route(entry) : route), {
-              status: options.status ?? 200,
-            });
+          : route instanceof Response
+            ? route
+            : new Response(encodeJson(typeof route === "function" ? route(entry) : route), {
+                status: options.status ?? 200,
+              });
       return Effect.succeed(HttpClientResponse.fromWeb(request, response));
     },
   );
@@ -515,6 +517,10 @@ describe("GitCafePullRequestProvider", () => {
   it.effect("still reads a pull request whose reviewers the token may not see", () => {
     const server = fakeGitCafe({
       "GET /repos/owner/repo/pulls/7": { ...pull, headOid: null },
+      "GET /repos/owner/repo/pulls/7/reviewers": new Response(
+        encodeJson({ type: "https://cafe.sh/errors/forbidden" }),
+        { status: 403 },
+      ),
       "GET /repos/owner/repo/pulls/7/labels": { items: [labels[0]], next: null },
       "GET /repos/owner/repo/pulls/7/status": {
         merge: { conflicts: "unknown", fastForward: null, strategies: [] },
@@ -526,6 +532,23 @@ describe("GitCafePullRequestProvider", () => {
       const detail = yield* provider.getChangeRequest(target);
       assert.deepStrictEqual(detail.reviewers, []);
       assert.deepStrictEqual(detail.labels, [{ name: "bug", color: "#d73a4a" }]);
+    }).pipe(Effect.provide(server.layer));
+  });
+
+  it.effect("fails the detail rather than hide reviewers GitCafe could not serve", () => {
+    const server = fakeGitCafe({
+      "GET /repos/owner/repo/pulls/7": { ...pull, headOid: null },
+      "GET /repos/owner/repo/pulls/7/reviewers": new Response("", { status: 503 }),
+      "GET /repos/owner/repo/pulls/7/labels": { items: [], next: null },
+      "GET /repos/owner/repo/pulls/7/status": {
+        merge: { conflicts: "unknown", fastForward: null, strategies: [] },
+        checks: { pending: 0, failing: 0, total: 0 },
+      },
+    });
+    return Effect.gen(function* () {
+      const provider = yield* GitCafePullRequestProvider.make;
+      const result = yield* provider.getChangeRequest(target).pipe(Effect.result);
+      assert.strictEqual(result._tag, "Failure");
     }).pipe(Effect.provide(server.layer));
   });
 

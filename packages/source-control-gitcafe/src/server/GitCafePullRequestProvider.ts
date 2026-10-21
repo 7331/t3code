@@ -71,6 +71,7 @@ const mergeStrategyOpen = (status: typeof Status.Type, strategy: string) =>
 
 const Id = TrimmedNonEmptyString.check(Schema.isPattern(/^[A-Za-z0-9_-]+$/u));
 const isId = Schema.is(Id);
+const isApiError = Schema.is(GitCafeApi.GitCafeApiError);
 const Principal = Schema.Struct({ handle: TrimmedNonEmptyString });
 const Written = Schema.Struct({ id: Id });
 const Versioned = Schema.Struct({ version: NonNegativeInt });
@@ -592,9 +593,9 @@ export const make = Effect.gen(function* () {
           // Reviewers need `pr:review:read`, which a contents-only token lacks.
           readPages("getChangeRequest", input, `${path}/reviewers`, Json.GitCafeActorEntries).pipe(
             Effect.catch((error) =>
-              error.reason === "unauthenticated" || error.reason === "rate-limited"
-                ? Effect.fail(error)
-                : Effect.succeed({ items: [], next: null }),
+              isApiError(error.cause) && error.cause.status === 403
+                ? Effect.succeed({ items: [], next: null })
+                : Effect.fail(error),
             ),
           ),
           readPages("getChangeRequest", input, `${path}/labels`, Json.GitCafeLabels),
