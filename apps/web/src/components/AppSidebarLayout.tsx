@@ -219,7 +219,7 @@ function routePanelsOpen(routeThreadRef: ReturnType<typeof useThreadRouteRef>) {
   };
 }
 
-function NavigationHistoryShortcuts() {
+export function NavigationHistoryShortcuts() {
   const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const routeThreadRef = useThreadRouteRef();
