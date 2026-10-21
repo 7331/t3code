@@ -61,6 +61,8 @@ if (values.scenario === "all" || repeat > 1) {
         process.execPath,
         [
           import.meta.filename,
+          "--root",
+          root,
           "--scenario",
           scenario,
           "--model",
@@ -818,6 +820,7 @@ try {
     );
     saveProjection("S-delegate-parent", parent);
     for (const task of parent.subagents) {
+      if (task.childThreadId === null) continue;
       const r = await fetch(
         `${origin}/api/orchestration/threads/${encodeURIComponent(task.childThreadId)}`,
         {
