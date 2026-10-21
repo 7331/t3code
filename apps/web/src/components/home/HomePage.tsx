@@ -4,7 +4,7 @@ import { useClientSettings } from "../../hooks/useSettings";
 import {
   useAllEnvironmentShellsBootstrapped,
   useProjects,
-  useThreadShells,
+  useQuietThreadShells,
 } from "../../state/entities";
 import { NoProjectsHero } from "../NoProjectsHero";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
@@ -21,7 +21,8 @@ import { useHomeCardActions } from "./useHomeCardActions";
 
 /** Several threads across projects at once, each readable and repliable without switching to it. */
 export function HomePage() {
-  const threads = useThreadShells();
+  // Quiet shells hold still through streaming ticks; cards read live output from their own atoms.
+  const threads = useQuietThreadShells();
   const projects = useProjects();
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
   const sortOrder = useClientSettings((settings) => settings.sidebarThreadSortOrder);
@@ -58,7 +59,7 @@ export function HomePage() {
             title={selection.source === "pinned" ? "Pinned threads" : "Recent threads"}
             description={
               selection.source === "recent"
-                ? "Nothing is pinned, so this shows each project’s latest thread. Pin threads to choose what stays here."
+                ? "Nothing is pinned, so this shows the latest thread with messages in each project. Pin threads to choose what stays here."
                 : null
             }
           />

@@ -420,3 +420,24 @@ export function workflowOpeningHeadline(opening: WorkflowOpening): {
     agents,
   };
 }
+
+/**
+ * A child thread's status as the Lineage panel files it: the status of the workflow it coordinates,
+ * when it coordinates one. Child threads without a workflow are absent.
+ */
+export function workflowStatusByChildThreadId(
+  subagents: Parameters<typeof projectedSubagentsToRuntime>[0],
+): ReadonlyMap<string, string> {
+  const groups = new Map(
+    deriveWorkflowGroups(projectedSubagentsToRuntime(subagents)).map((group) => [
+      group.workflow.id,
+      group,
+    ]),
+  );
+  const statuses = new Map<string, string>();
+  for (const subagent of subagents) {
+    const group = subagent.childThreadId ? groups.get(subagent.id) : undefined;
+    if (group !== undefined) statuses.set(subagent.childThreadId!, group.workflow.status);
+  }
+  return statuses;
+}

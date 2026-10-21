@@ -21,16 +21,22 @@ function HomeRouteView() {
   );
 }
 
+/** A usable id, or null for a missing or blank one, which `make` would reject by throwing. */
+function searchId(raw: unknown): string | null {
+  return typeof raw === "string" && raw.trim().length > 0 ? raw : null;
+}
+
 export const Route = createFileRoute("/_chat/home")({
-  validateSearch: (raw: Record<string, unknown>): HomeSearch =>
-    typeof raw.parentEnvironmentId === "string" &&
-    raw.parentEnvironmentId &&
-    typeof raw.parentThreadId === "string" &&
-    raw.parentThreadId
-      ? {
-          parentEnvironmentId: EnvironmentId.make(raw.parentEnvironmentId),
-          parentThreadId: ThreadId.make(raw.parentThreadId),
-        }
-      : {},
+  // A malformed board link falls back to Home instead of the router's error screen.
+  validateSearch: (raw: Record<string, unknown>): HomeSearch => {
+    const environmentId = searchId(raw.parentEnvironmentId);
+    const threadId = searchId(raw.parentThreadId);
+    return environmentId === null || threadId === null
+      ? {}
+      : {
+          parentEnvironmentId: EnvironmentId.make(environmentId),
+          parentThreadId: ThreadId.make(threadId),
+        };
+  },
   component: HomeRouteView,
 });

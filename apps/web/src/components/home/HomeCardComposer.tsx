@@ -2,7 +2,11 @@ import {
   resolveProviderSkillsForCwd,
   resolveProviderSlashCommandsForCwd,
 } from "@t3tools/client-runtime/providerSkills";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import { resolveComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
+import {
+  type EnvironmentThreadShell,
+  threadRuntimeIsActive,
+} from "@t3tools/client-runtime/state/models";
 import { isAtomCommandInterrupted } from "@t3tools/client-runtime/state/runtime";
 import {
   AuthOrchestrationOperateScope,
@@ -76,6 +80,7 @@ export function HomeCardComposer({
   readonly model: HomeCardModel;
 }) {
   const sendShortcut = useClientSettings((clientSettings) => clientSettings.sendShortcut);
+  const followUpBehavior = useClientSettings((clientSettings) => clientSettings.followUpBehavior);
   const { resolvedTheme } = useTheme();
   const draft = useComposerThreadDraft(threadRef);
   const setPrompt = useComposerDraftStore((store) => store.setPrompt);
@@ -158,21 +163,29 @@ export function HomeCardComposer({
     setCursor(0);
     setTrigger(null);
     const modelSelection = homeCardSendModelSelection(thread.modelSelection, draftModel);
-    // "auto" dispatch steers or queues behind a running turn, as the thread's own composer does.
+    // The same choices the thread's composer would send: the draft's modes and model, and the
+    // user's follow-up setting for a running turn.
     const result = await startTurn({
       environmentId: thread.environmentId,
       input: {
         threadId: thread.id,
         message: { messageId: newMessageId(), role: "user", text, attachments: [] },
         ...(modelSelection ? { modelSelection } : {}),
-        runtimeMode: thread.runtimeMode,
-        interactionMode: thread.interactionMode,
+        titleSeed: thread.title,
+        runtimeMode: draft.runtimeMode ?? thread.runtimeMode,
+        interactionMode: draft.interactionMode ?? thread.interactionMode,
+        dispatchMode: resolveComposerDispatchMode({
+          running: threadRuntimeIsActive(thread.runtime),
+          alternateModifier: false,
+          activeTurnDefault: followUpBehavior,
+        }),
       },
     });
     setSending(false);
     if (result._tag === "Success") return;
-    // Put the text back unless something new was typed meanwhile.
-    if (useComposerDraftStore.getState().getComposerDraft(threadRef)?.prompt.length === 0) {
+    // Clearing a text-only draft removes it, so an absent draft counts as empty. Text typed
+    // meanwhile wins over the restore.
+    if ((useComposerDraftStore.getState().getComposerDraft(threadRef)?.prompt ?? "") === "") {
       setPrompt(threadRef, prompt);
     }
     if (!isAtomCommandInterrupted(result)) {

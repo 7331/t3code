@@ -17,6 +17,7 @@ export type HomeCardMenuItem = Extract<
   { readonly type: "path" | "skill" | "provider-slash-command" }
 >;
 
+/** Narrows the composer's menu items to the ones a card can insert. */
 export function isHomeCardMenuItem(item: ComposerCommandItem): item is HomeCardMenuItem {
   return item.type === "path" || item.type === "skill" || item.type === "provider-slash-command";
 }
@@ -56,16 +57,14 @@ export function stepHomeCardMenuHighlight(
 }
 
 /**
- * The model a card reply asks for: the draft's pick for the thread's own provider instance when it
- * differs from the thread's model, otherwise nothing so the server keeps the thread's selection.
+ * The model selection a card reply sends: the draft's pick for the thread's own provider instance,
+ * options included, as the thread composer sends it. Without one the server keeps the thread's.
  */
 export function homeCardSendModelSelection(
   threadSelection: ModelSelection,
   draftSelection: ModelSelection | undefined,
 ): ModelSelection | undefined {
-  if (draftSelection === undefined) return undefined;
-  if (draftSelection.instanceId !== threadSelection.instanceId) return undefined;
-  return draftSelection.model === threadSelection.model ? undefined : draftSelection;
+  return draftSelection?.instanceId === threadSelection.instanceId ? draftSelection : undefined;
 }
 
 /** The model a card's next reply runs on: the draft's pick for the thread's instance, else the thread's. */

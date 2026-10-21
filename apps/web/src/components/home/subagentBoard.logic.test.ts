@@ -19,9 +19,11 @@ function shell(input: {
   readonly relationship?: "subagent" | "fork";
   readonly creationSource?: "provider" | "mcp";
   readonly parentId?: ThreadId | null;
+  readonly archived?: boolean;
 }) {
   return {
     id: ThreadId.make(input.id),
+    archivedAt: input.archived ? "2026-10-21T10:00:00.000Z" : null,
     title: input.id,
     status: input.status,
     creationSource: input.creationSource ?? "mcp",
@@ -34,12 +36,18 @@ function shell(input: {
   };
 }
 
-function select(threads: ReadonlyArray<ReturnType<typeof shell>>) {
+function select(
+  threads: ReadonlyArray<ReturnType<typeof shell>>,
+  options: {
+    readonly statusOverrides?: ReadonlyMap<string, string>;
+    readonly isAvailable?: (threadId: ThreadId) => boolean;
+  } = {},
+) {
   const graph = deriveThreadRelationshipGraph({
     threads: [shell({ id: "parent", minute: 0, status: "running", parentId: null }), ...threads],
     projection: null,
   } as never);
-  return selectSubagentBoardChildren(graph, parent);
+  return selectSubagentBoardChildren({ graph, parentThreadId: parent, ...options });
 }
 
 describe("selectSubagentBoardChildren", () => {
@@ -74,6 +82,42 @@ describe("selectSubagentBoardChildren", () => {
       "done-new",
       "done-old",
     ]);
+  });
+
+  it("leaves out archived subagents and ones the client holds no shell for", () => {
+    const selection = select(
+      [
+        shell({ id: "live", minute: 1, status: "running" }),
+        shell({ id: "archived", minute: 2, status: "running", archived: true }),
+        shell({ id: "unknown", minute: 3, status: "running" }),
+      ],
+      { isAvailable: (threadId) => threadId !== "unknown" },
+    );
+
+    expect(selection.children.map((child) => child.threadId)).toEqual(["live"]);
+    expect(selection.total).toBe(1);
+  });
+
+  it("uses Lineage's workflow status over the child's own", () => {
+    const { children } = select([shell({ id: "coordinator", minute: 1, status: "completed" })], {
+      statusOverrides: new Map([["coordinator", "running"]]),
+    });
+
+    expect(children).toEqual([
+      { threadId: "coordinator", readOnly: false, active: true, status: "running" },
+    ]);
+  });
+
+  it("counts active subagents across the whole fan-out, not only the shown cards", () => {
+    const selection = select(
+      Array.from({ length: HOME_MAX_CARDS + 2 }, (_, index) =>
+        shell({ id: `worker-${index}`, minute: index + 1, status: "running" }),
+      ),
+    );
+
+    expect(selection.children).toHaveLength(HOME_MAX_CARDS - 1);
+    expect(selection.total).toBe(HOME_MAX_CARDS + 2);
+    expect(selection.activeCount).toBe(HOME_MAX_CARDS + 2);
   });
 
   it("caps the board and counts the subagents left off", () => {
@@ -112,10 +156,8 @@ describe("subagentStatusTone", () => {
     ]);
     expect(subagentStatusTone("completed")).toBe("done");
     expect(subagentStatusTone("error")).toBe("failed");
-    expect(["cancelled", "idle", null].map(subagentStatusTone)).toEqual([
-      "muted",
-      "muted",
-      "muted",
-    ]);
+    expect(["cancelled", "idle"].map(subagentStatusTone)).toEqual(["muted", "muted"]);
+    // Lineage files an unknown status with the live agents, so the card does too.
+    expect(subagentStatusTone(null)).toBe("active");
   });
 });

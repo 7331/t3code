@@ -66,11 +66,15 @@ describe("homeCardSendModelSelection", () => {
   const codex = ProviderInstanceId.make("codex");
   const thread = createModelSelection(codex, "gpt-5.6");
 
-  it("sends nothing when the draft keeps the thread's model", () => {
+  it("sends nothing without a draft pick, so the server keeps the thread's model", () => {
     expect(homeCardSendModelSelection(thread, undefined)).toBeUndefined();
-    expect(homeCardSendModelSelection(thread, createModelSelection(codex, "gpt-5.6"))).toBe(
-      undefined,
-    );
+  });
+
+  it("keeps the draft's options even when the model matches the thread's", () => {
+    const sameModelMoreEffort = createModelSelection(codex, "gpt-5.6", [
+      { id: "reasoningEffort", value: "high" },
+    ]);
+    expect(homeCardSendModelSelection(thread, sameModelMoreEffort)).toBe(sameModelMoreEffort);
   });
 
   it("sends the draft's model for the thread's own provider instance", () => {

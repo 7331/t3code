@@ -100,7 +100,7 @@ export function SidebarBrandWidthProbe({
   );
 }
 
-/** The wordmark is the way Home, as Portal's logo glyph is; a new draft stays on "New thread". */
+/** The wordmark opens Home; starting a new draft lives on the "New thread" button. */
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <Tooltip>

@@ -30,6 +30,7 @@ export function useCollapsedHomeCards() {
   };
 }
 
+/** Home's page frame: the workspace header with a breadcrumb, then a scrolling, centred column. */
 export function HomePageShell({
   breadcrumbLabel,
   breadcrumb,
@@ -53,6 +54,7 @@ export function HomePageShell({
   );
 }
 
+/** A section title over the cards, with an optional line saying why they are the ones shown. */
 export function HomeSectionHeading({
   title,
   description,
@@ -68,6 +70,10 @@ export function HomeSectionHeading({
   );
 }
 
+/**
+ * The first card spans the grid, the rest pair up on wide screens, and a card left alone in the
+ * last row spans too.
+ */
 export function HomeCardGrid({
   cards,
 }: {

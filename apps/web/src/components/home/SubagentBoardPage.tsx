@@ -1,4 +1,5 @@
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { workflowStatusByChildThreadId } from "@t3tools/client-runtime/state/subagentRuntime";
 import { deriveThreadRelationshipGraph } from "@t3tools/client-runtime/state/thread-relationships";
 import { isProviderNativeSubagentThread, type ScopedThreadRef } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
@@ -7,7 +8,7 @@ import type { ReactNode } from "react";
 import {
   useThreadProjection,
   useThreadRelationshipShells,
-  useThreadShells,
+  useQuietThreadShells,
 } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
@@ -26,7 +27,8 @@ import { useHomeCardActions } from "./useHomeCardActions";
 export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThreadRef }) {
   const projection = useThreadProjection(parentRef)?.projection ?? null;
   const relationshipShells = useThreadRelationshipShells(parentRef);
-  const threads = useThreadShells();
+  // Quiet shells hold still through streaming ticks; cards read live output from their own atoms.
+  const threads = useQuietThreadShells();
   const collapsed = useCollapsedHomeCards();
   const cardActions = useHomeCardActions();
 
@@ -37,12 +39,16 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
   );
   const parent = shellsById.get(parentRef.threadId) ?? null;
   const graph = deriveThreadRelationshipGraph({ threads: relationshipShells, projection });
-  const board = selectSubagentBoardChildren(graph, parentRef.threadId);
-  const children = board.children.flatMap((child) => {
-    const thread = shellsById.get(child.threadId);
-    return thread === undefined ? [] : [{ ...child, thread }];
+  const board = selectSubagentBoardChildren({
+    graph,
+    parentThreadId: parentRef.threadId,
+    statusOverrides: workflowStatusByChildThreadId(projection?.subagents ?? []),
+    isAvailable: (threadId) => shellsById.has(threadId),
   });
-  const activeCount = children.filter((child) => child.active).length;
+  const children = board.children.map((child) => ({
+    ...child,
+    thread: shellsById.get(child.threadId)!,
+  }));
   const parentReadOnly = projection !== null && isProviderNativeSubagentThread(projection.thread);
 
   // Follow-ups add subagent records for the same child; its first titled record names it.
@@ -125,9 +131,9 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
         <>
           <HomeSectionHeading
             title={
-              children.length === 0
+              board.total === 0
                 ? "No subagents yet"
-                : `${children.length + board.hiddenCount} subagents · ${activeCount} active`
+                : `${board.total} subagents · ${board.activeCount} active`
             }
             description={
               board.hiddenCount > 0

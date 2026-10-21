@@ -882,38 +882,31 @@ export interface SidebarRowStatus {
   readonly className: string;
 }
 
-/** The word and tone a thread row leads with; Home cards use the same so the two never disagree. */
+const SIDEBAR_ROW_STATUS_PRESENTATION = {
+  working: { label: "Working", icon: "working", className: "text-info" },
+  waiting: { label: "Waiting", icon: "waiting", className: "text-muted-foreground" },
+  approval: { label: "Approval", icon: "approval", className: "text-warning-foreground" },
+  input: { label: "Input", icon: "input", className: "text-indigo-600 dark:text-indigo-300" },
+  limited: { label: "Limited", icon: "failed", className: "text-warning" },
+  failed: { label: "Failed", icon: "failed", className: "text-error" },
+  woke: { label: "Woke", icon: "woke", className: "text-warning" },
+  done: { label: "Done", icon: "done", className: "text-success" },
+} as const satisfies Record<SidebarV2TopStatusKind, SidebarRowStatus>;
+
+/**
+ * The word, glyph and tone a thread row leads with, for the status `resolveSidebarV2TopStatus`
+ * picks. Home cards draw the same, so the two never disagree.
+ */
 export function resolveSidebarRowStatus(input: {
   readonly status: SidebarThreadStatus;
   readonly goalActive: boolean;
   readonly isWoke: boolean;
   readonly isUnread: boolean;
 }): SidebarRowStatus | null {
-  switch (input.status) {
-    case "working":
-      return {
-        label: input.goalActive ? "Goal" : "Working",
-        icon: "working",
-        className: "text-info",
-      };
-    case "waiting":
-      return { label: "Waiting", icon: "waiting", className: "text-muted-foreground" };
-    case "approval":
-      return { label: "Approval", icon: "approval", className: "text-warning-foreground" };
-    case "input":
-      return {
-        label: "Input",
-        icon: "input",
-        className: "text-indigo-600 dark:text-indigo-300",
-      };
-    case "limited":
-      return { label: "Limited", icon: "failed", className: "text-warning" };
-    case "failed":
-      return { label: "Failed", icon: "failed", className: "text-error" };
-    case "ready":
-      if (input.isWoke) return { label: "Woke", icon: "woke", className: "text-warning" };
-      return input.isUnread ? { label: "Done", icon: "done", className: "text-success" } : null;
-  }
+  const kind = resolveSidebarV2TopStatus(input);
+  if (kind === null) return null;
+  const presentation = SIDEBAR_ROW_STATUS_PRESENTATION[kind];
+  return kind === "working" && input.goalActive ? { ...presentation, label: "Goal" } : presentation;
 }
 
 export function shouldRecedeSidebarThread(input: {

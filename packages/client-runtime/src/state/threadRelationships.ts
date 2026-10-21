@@ -246,3 +246,17 @@ export function orderWebThreadLineageRows(input: {
     return left.threadId < right.threadId ? -1 : left.threadId > right.threadId ? 1 : 0;
   });
 }
+
+const SETTLED_SUBAGENT_STATUSES: ReadonlySet<string> = new Set([
+  "completed",
+  "failed",
+  "error",
+  "cancelled",
+  "interrupted",
+  "idle",
+]);
+
+/** Whether a subagent edge has finished; the Lineage panel files these under "Previous agents". */
+export function isSettledSubagentStatus(status: string | null): boolean {
+  return status !== null && SETTLED_SUBAGENT_STATUSES.has(status);
+}
