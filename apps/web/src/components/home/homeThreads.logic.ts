@@ -109,11 +109,10 @@ export function homeCardThreadActions(input: {
   };
 }
 
-/** A card's second line: project, branch and the model its next reply uses, skipping missing parts. */
+/** A card's second line: project and branch, skipping whichever a thread lacks. */
 export function homeCardSubtitle(parts: {
   readonly projectTitle: string | null | undefined;
   readonly branch: string | null;
-  readonly modelLabel: string;
 }): string {
-  return [parts.projectTitle, parts.branch, parts.modelLabel].filter(Boolean).join(" · ");
+  return [parts.projectTitle, parts.branch].filter(Boolean).join(" · ");
 }

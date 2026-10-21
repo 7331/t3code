@@ -11,7 +11,6 @@ import {
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
-  BotIcon,
   ChevronDownIcon,
   CircleCheckIcon,
   CircleDotIcon,
@@ -42,7 +41,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HomeCardComposer } from "./HomeCardComposer";
 import { threadRelationshipStatusLabel } from "../chat/ThreadRelationshipIcon";
 import { homeCardSubtitle, latestHomeCardMessages } from "./homeThreads.logic";
-import { useHomeCardModel } from "./useHomeCardModel";
+import { type HomeCardModel, useHomeCardModel } from "./useHomeCardModel";
+import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { subagentStatusTone } from "./subagentBoard.logic";
 
 interface CardToggle {
@@ -97,11 +97,7 @@ export function HomeThreadCard({
     }),
   });
   const routeParams = buildThreadRouteParams(threadRef);
-  const subtitle = homeCardSubtitle({
-    projectTitle: project?.title,
-    branch: thread.branch,
-    modelLabel: model.label,
-  });
+  const subtitle = homeCardSubtitle({ projectTitle: project?.title, branch: thread.branch });
   const cwd = thread.worktreePath ?? project?.workspaceRoot ?? null;
 
   return (
@@ -136,7 +132,8 @@ export function HomeThreadCard({
             ) : null}
           </div>
           {/* Always one line tall, so cards keep their height when a subtitle part is missing. */}
-          <span className="flex h-4 min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <span className="flex h-4 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <HomeCardAgentEmblem model={model} />
             <span className="truncate">{subtitle}</span>
             <ThreadWorktreeIndicator thread={thread} />
           </span>
@@ -172,7 +169,7 @@ export function HomeThreadCard({
           <>
             <HomeCardTranscript threadRef={threadRef} cwd={cwd ?? undefined} />
             {readOnly ? (
-              <HomeCardProviderSubagentFooter threadRef={threadRef} modelLabel={model.label} />
+              <HomeCardProviderSubagentFooter threadRef={threadRef} model={model} />
             ) : (
               <HomeCardComposer
                 thread={thread}
@@ -206,6 +203,30 @@ function SubagentStatusLabel({ status }: { readonly status: string | null }) {
       <SidebarRowStatusIconView icon={tone.icon} className="size-3.5" />
       {threadRelationshipStatusLabel(status)}
     </span>
+  );
+}
+
+/** The agent's logo, as sidebar rows show it; the model it will run on is in the tooltip. */
+function HomeCardAgentEmblem({ model }: { readonly model: HomeCardModel }) {
+  const { entry } = model;
+  if (entry === null) return null;
+  const label = `${entry.displayName} · ${model.label}`;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<span role="img" aria-label={label} className="inline-flex shrink-0" />}
+      >
+        <ProviderInstanceIcon
+          driverKind={entry.driverKind}
+          displayName={entry.displayName}
+          accentColor={entry.accentColor}
+          acpRegistryAgentId={entry.acpRegistryAgentId}
+          acpRegistryIconUrl={entry.acpRegistryIconUrl}
+          size="compact"
+        />
+      </TooltipTrigger>
+      <TooltipPopup side="top">{label}</TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -321,10 +342,10 @@ function HomeCardMessages({
 
 function HomeCardProviderSubagentFooter({
   threadRef,
-  modelLabel,
+  model,
 }: {
   readonly threadRef: ScopedThreadRef;
-  readonly modelLabel: string;
+  readonly model: HomeCardModel;
 }) {
   const projection = useThreadProjection(threadRef)?.projection ?? null;
   const status = projection === null ? null : deriveProviderSubagentStatus(projection);
@@ -335,10 +356,8 @@ function HomeCardProviderSubagentFooter({
   );
   return (
     <div className="flex items-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
-      <BotIcon className="size-3.5 shrink-0" />
-      <span className="truncate">
-        {statusLabel} · {modelLabel}
-      </span>
+      <HomeCardAgentEmblem model={model} />
+      <span className="truncate">{statusLabel}</span>
       <span className="ms-auto shrink-0">Run by the provider; reply in the parent</span>
     </div>
   );

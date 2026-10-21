@@ -173,12 +173,10 @@ describe("latestHomeCardMessages default", () => {
 });
 
 describe("homeCardSubtitle", () => {
-  it("joins project, branch and model, skipping what a thread lacks", () => {
-    expect(
-      homeCardSubtitle({ projectTitle: "Desktop", branch: "feat/home", modelLabel: "GPT-6-Luna" }),
-    ).toBe("Desktop · feat/home · GPT-6-Luna");
-    expect(
-      homeCardSubtitle({ projectTitle: "Desktop", branch: null, modelLabel: "GPT-6-Luna" }),
-    ).toBe("Desktop · GPT-6-Luna");
+  it("joins project and branch, skipping what a thread lacks", () => {
+    expect(homeCardSubtitle({ projectTitle: "Desktop", branch: "feat/home" })).toBe(
+      "Desktop · feat/home",
+    );
+    expect(homeCardSubtitle({ projectTitle: "Desktop", branch: null })).toBe("Desktop");
   });
 });
