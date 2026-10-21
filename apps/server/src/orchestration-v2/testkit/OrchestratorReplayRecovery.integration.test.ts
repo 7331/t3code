@@ -90,7 +90,7 @@ const CODEX_SUBAGENT_CONTINUE_MODEL_SELECTION = { ...CODEX_MODEL_SELECTION, mode
  */
 const readCodexSubagentContinueAfterRestartTranscript = Effect.fn(
   "readCodexSubagentContinueAfterRestartTranscript",
-)(function* (workspace: string) {
+)(function* (workspace: string, childTurnOrder: "after_parent" | "before_parent") {
   const recorded = yield* readRawTranscript(
     new URL("./fixtures/subagent_continue/codex_transcript.ndjson", import.meta.url),
   );
@@ -115,6 +115,16 @@ const readCodexSubagentContinueAfterRestartTranscript = Effect.fn(
   if (initialize === undefined || initializeResult === undefined || initialized === undefined) {
     throw new Error("subagent_continue must open with the initialize handshake.");
   }
+  const continuation = entries.slice(secondTurnStart + 2);
+  const earlyChildStartIndex =
+    childTurnOrder === "before_parent"
+      ? continuation.findIndex(
+          (entry) =>
+            entry.type === "emit_inbound" &&
+            Object(entry.frame).method === "turn/started" &&
+            Object(Object(entry.frame).params).threadId !== nativeThreadId,
+        )
+      : -1;
   return yield* decodeCodexTranscript(
     materializeReplayTranscriptWorkspace(
       {
@@ -147,8 +157,9 @@ const readCodexSubagentContinueAfterRestartTranscript = Effect.fn(
             frame: { id: 2, result: threadStartResult },
           },
           renumber(entries[secondTurnStart]!, 3),
+          ...continuation.filter((_, index) => index === earlyChildStartIndex),
           renumber(entries[secondTurnStart + 1]!, 3),
-          ...entries.slice(secondTurnStart + 2),
+          ...continuation.filter((_, index) => index !== earlyChildStartIndex),
         ],
       },
       workspace,
@@ -450,97 +461,110 @@ describe("orchestrator replay recovery", () => {
 
   // regression: #15567 a restart dropped the Codex child registry, so a resumed
   // parent's messages to an existing child never reached the child's thread.
-  it.effect("keeps a Codex subagent the parent messages after a server restart in its thread", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const workspace = yield* checkpointWorkspace("subagent_continue");
-        const transcript = yield* readCodexSubagentContinueAfterRestartTranscript(workspace);
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const tempDir = yield* Effect.acquireRelease(
-          fs.makeTempDirectory({ prefix: "t3-orchestration-v2-codex-subagent-recovery-" }),
-          (directory) => fs.remove(directory, { recursive: true, force: true }).pipe(Effect.orDie),
-        );
-        const driver = yield* CodexReplay.makeReplayDriver(transcript);
-        const materialized = yield* materializeFixtureInput({
-          scenario: transcript.scenario,
-          fixtureInput: {
-            steps: [
-              { type: "message", text: SUBAGENT_CONTINUE_PROMPT },
-              { type: "message", text: SUBAGENT_CONTINUE_PARENT_PROMPT },
-            ],
-          },
-          driver: ProviderDriverKind.make("codex"),
-          modelSelection: CODEX_SUBAGENT_CONTINUE_MODEL_SELECTION,
-        });
-        const { phase1Commands, phase1Steps, phase2Commands, phase2Steps } =
-          splitAfterFirstIdle(materialized);
-        const harness = {
-          ...CodexOrchestratorReplayHarness,
-          makeProviderAdapterRegistryLayer: () =>
-            CodexAdapterV2Testkit.layer({ transcript, driver }),
-        };
-        const options = {
-          databaseLayer: SqlitePersistence.layerFromPath(path.join(tempDir, "state.sqlite")).pipe(
-            Layer.provide(NodeServices.layer),
-          ),
-        };
-        const scenario = (
-          name: string,
-          steps: typeof phase1Steps,
-          commands: typeof phase1Commands,
-        ) => ({
-          name: `${transcript.scenario}:${name}`,
-          transcript,
-          commands,
-          steps,
-          projectionThreadIds: materialized.projectionThreadIds,
-          runtimePolicyOverride: { cwd: workspace },
-        });
+  it.effect.each(["after_parent", "before_parent"] as const)(
+    "keeps a Codex subagent the parent messages after a server restart in its thread (%s)",
+    (childTurnOrder) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const workspace = yield* checkpointWorkspace("subagent_continue");
+          const transcript = yield* readCodexSubagentContinueAfterRestartTranscript(
+            workspace,
+            childTurnOrder,
+          );
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const tempDir = yield* Effect.acquireRelease(
+            fs.makeTempDirectory({ prefix: "t3-orchestration-v2-codex-subagent-recovery-" }),
+            (directory) =>
+              fs.remove(directory, { recursive: true, force: true }).pipe(Effect.orDie),
+          );
+          const driver = yield* CodexReplay.makeReplayDriver(transcript);
+          const materialized = yield* materializeFixtureInput({
+            scenario: transcript.scenario,
+            fixtureInput: {
+              steps: [
+                { type: "message", text: SUBAGENT_CONTINUE_PROMPT },
+                { type: "message", text: SUBAGENT_CONTINUE_PARENT_PROMPT },
+              ],
+            },
+            driver: ProviderDriverKind.make("codex"),
+            modelSelection: CODEX_SUBAGENT_CONTINUE_MODEL_SELECTION,
+          });
+          const { phase1Commands, phase1Steps, phase2Commands, phase2Steps } =
+            splitAfterFirstIdle(materialized);
+          const harness = {
+            ...CodexOrchestratorReplayHarness,
+            makeProviderAdapterRegistryLayer: () =>
+              CodexAdapterV2Testkit.layer({ transcript, driver }),
+          };
+          const options = {
+            databaseLayer: SqlitePersistence.layerFromPath(path.join(tempDir, "state.sqlite")).pipe(
+              Layer.provide(NodeServices.layer),
+            ),
+          };
+          const scenario = (
+            name: string,
+            steps: typeof phase1Steps,
+            commands: typeof phase1Commands,
+          ) => ({
+            name: `${transcript.scenario}:${name}`,
+            transcript,
+            commands,
+            steps,
+            projectionThreadIds: materialized.projectionThreadIds,
+            runtimePolicyOverride: { cwd: workspace },
+          });
 
-        const before = yield* runOrchestratorV2ProviderReplayScenario(
-          scenario("first-runtime", phase1Steps, phase1Commands),
-          harness,
-          options,
-        );
-        const spawned = projectionFor(before, transcript.scenario).subagents[0];
-        assert.equal(spawned?.result, "initial subagent response");
+          const before = yield* runOrchestratorV2ProviderReplayScenario(
+            scenario("first-runtime", phase1Steps, phase1Commands),
+            harness,
+            options,
+          );
+          const spawned = projectionFor(before, transcript.scenario).subagents[0];
+          assert.equal(spawned?.result, "initial subagent response");
 
-        const result = yield* runOrchestratorV2ProviderReplayScenario(
-          scenario("second-runtime", phase2Steps, phase2Commands),
-          harness,
-          options,
-        );
+          const result = yield* runOrchestratorV2ProviderReplayScenario(
+            scenario("second-runtime", phase2Steps, phase2Commands),
+            harness,
+            options,
+          );
 
-        const projection = projectionFor(result, transcript.scenario);
-        assertSemanticProjectionIntegrity(projection);
-        assert.lengthOf(projection.subagents, 1);
-        const subagent = projection.subagents[0];
-        assert.equal(subagent?.id, spawned?.id);
-        assert.equal(subagent?.childThreadId, spawned?.childThreadId);
-        assert.equal(subagent?.status, "completed");
-        assert.equal(subagent?.result, "continued subagent response");
-        const childThreads = [...result.projections.values()].filter(
-          (candidate) => candidate.thread.lineage.parentThreadId === projection.thread.id,
-        );
-        assert.lengthOf(childThreads, 1);
-        const child = childThreads[0];
-        assert.equal(child?.thread.id, spawned?.childThreadId);
-        assert.lengthOf(child?.providerTurns ?? [], 2);
-        assertUserMessagesInclude(child!, [SUBAGENT_CONTINUE_CHILD_PROMPT]);
-        assertAssistantTextIncludes(child!, "continued subagent response");
-        assert.isFalse(
-          projection.turnItems.some(
-            (item) =>
-              item.type === "assistant_message" && item.text === "continued subagent response",
-          ),
-          "the child's reply leaked into the parent thread",
-        );
-      }).pipe(
-        provideDeterministicTestRuntime,
-        Effect.provide(Layer.merge(IdAllocator.layer, NodeServices.layer)),
+          const projection = projectionFor(result, transcript.scenario);
+          assertSemanticProjectionIntegrity(projection);
+          assert.lengthOf(projection.subagents, 1);
+          const subagent = projection.subagents[0];
+          assert.equal(subagent?.id, spawned?.id);
+          assert.equal(subagent?.childThreadId, spawned?.childThreadId);
+          assert.equal(subagent?.status, "completed");
+          assert.equal(subagent?.result, "continued subagent response");
+          const childThreads = [...result.projections.values()].filter(
+            (candidate) => candidate.thread.lineage.parentThreadId === projection.thread.id,
+          );
+          assert.lengthOf(childThreads, 1);
+          const child = childThreads[0];
+          assert.equal(child?.thread.id, spawned?.childThreadId);
+          assert.lengthOf(child?.providerTurns ?? [], 2);
+          assertUserMessagesInclude(child!, [SUBAGENT_CONTINUE_CHILD_PROMPT]);
+          assertAssistantTextIncludes(child!, "continued subagent response");
+          // The parent independently repeats the same text in this recording.
+          const childReplies = new Set(
+            child!.turnItems.flatMap((item) =>
+              item.type === "assistant_message" && item.text === "continued subagent response"
+                ? [item.id]
+                : [],
+            ),
+          );
+          assert.equal(childReplies.size, 1);
+          assertAssistantTextIncludes(projection, "continued subagent response");
+          assert.isFalse(
+            projection.turnItems.some((item) => childReplies.has(item.id)),
+            "the child's reply leaked into the parent thread",
+          );
+        }).pipe(
+          provideDeterministicTestRuntime,
+          Effect.provide(Layer.merge(IdAllocator.layer, NodeServices.layer)),
+        ),
       ),
-    ),
   );
 
   it.effect(

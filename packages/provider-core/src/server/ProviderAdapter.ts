@@ -547,6 +547,14 @@ export type ProviderAdapterV2SubagentOutcome = {
   readonly result: OrchestrationV2Subagent["result"];
 };
 
+export interface ProviderAdapterV2SubagentThread {
+  readonly task: OrchestrationV2Subagent;
+  readonly thread: OrchestrationV2AppThread;
+  readonly providerThread: OrchestrationV2ProviderThread;
+  readonly providerTurns: ReadonlyArray<OrchestrationV2ProviderTurn>;
+  readonly turnItem: Extract<OrchestrationV2TurnItem, { readonly type: "subagent" }>;
+}
+
 export interface ProviderAdapterV2SessionRuntime {
   readonly instanceId: ProviderInstanceId;
   readonly driver: ProviderDriverKind;
@@ -560,6 +568,10 @@ export interface ProviderAdapterV2SessionRuntime {
    */
   readonly subscribeEvents?: Effect.Effect<ProviderAdapterV2EventSubscription>;
   readonly hasPendingBackgroundWork?: Effect.Effect<boolean>;
+  /** Restore native child routing before starting a turn in a recreated runtime. */
+  readonly restoreSubagentThreads?: (
+    threads: ReadonlyArray<ProviderAdapterV2SubagentThread>,
+  ) => Effect.Effect<void, ProviderAdapterV2Error>;
   /**
    * When present, RunExecutionService uses only this probe (never the
    * session-wide hasPendingBackgroundWork) so sibling native threads cannot pin

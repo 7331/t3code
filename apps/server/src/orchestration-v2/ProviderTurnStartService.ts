@@ -1221,6 +1221,57 @@ export const layer: Layer.Layer<
         !noteContinuation
           ? session
           : makeDeliverySession(session, startWithHandoffs);
+      if (session.restoreSubagentThreads !== undefined) {
+        const restored: Array<ProviderAdapter.ProviderAdapterV2SubagentThread> = [];
+        const pending = [
+          yield* projectionStore.getThreadRecords(
+            projection.thread.id,
+            ["subagents", "turnItems"],
+            { turnItemTypes: ["subagent"] },
+          ),
+        ];
+        const visited = new Set<ThreadId>();
+        for (const parent of pending) {
+          if (visited.has(parent.thread.id)) continue;
+          visited.add(parent.thread.id);
+          const items = new Map(
+            parent.turnItems.flatMap((item) =>
+              item.type === "subagent" ? [[item.subagentId, item] as const] : [],
+            ),
+          );
+          for (const task of parent.subagents) {
+            const turnItem = items.get(task.id);
+            if (
+              task.origin !== "provider_native" ||
+              task.providerInstanceId !== session.instanceId ||
+              task.childThreadId === null ||
+              task.providerThreadId === null ||
+              turnItem === undefined
+            )
+              continue;
+            const child = yield* projectionStore.getThreadRecords(
+              task.childThreadId,
+              ["providerThreads", "providerTurns", "subagents", "turnItems"],
+              { turnItemTypes: ["subagent"] },
+            );
+            const childProviderThread = child.providerThreads.find(
+              (candidate) => candidate.id === task.providerThreadId,
+            );
+            if (childProviderThread === undefined) continue;
+            restored.push({
+              task,
+              thread: child.thread,
+              providerThread: childProviderThread,
+              providerTurns: child.providerTurns.filter(
+                (turn) => turn.providerThreadId === childProviderThread.id,
+              ),
+              turnItem,
+            });
+            pending.push(child);
+          }
+        }
+        yield* session.restoreSubagentThreads(restored);
+      }
       return runExecution.startRootRun({
         commandId: CommandId.make(`command:effect:provider-turn.start:${run.id}`),
         appThread: projection.thread,
