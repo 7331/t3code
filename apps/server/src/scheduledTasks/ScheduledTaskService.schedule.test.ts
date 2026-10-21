@@ -124,6 +124,10 @@ it.effect("keeps the task list order when a toggle or edit rewrites updated_at",
       NodeCrypto.layer,
       Scheduler.layer,
       Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
+      Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+        namedProjectsRoot: "/projects",
+        isScratchProject: () => Effect.succeed(false),
+      }),
       Layer.mock(ThreadManagementService.ThreadManagementService)({}),
       Layer.mock(SecretRequests.SecretRequests)({}),
     );
