@@ -387,9 +387,15 @@ export const OrchestratorMcpThreadReadInput = Schema.Struct({
   textOffset: Schema.optional(NonNegativeInt),
   view: Schema.optional(Schema.Literals(["messages", "activity"])),
   afterPosition: Schema.optional(NonNegativeInt),
-  limit: Schema.optional(clampedPositiveInt(100)),
-  runLimit: Schema.optional(clampedPositiveInt(50)),
-  maxCharsPerItem: Schema.optional(clampedPositiveInt(50_000)),
+  limit: Schema.optional(clampedPositiveInt(100)).annotate({
+    description: "Maximum timeline items to return, from 1 to 100.",
+  }),
+  runLimit: Schema.optional(clampedPositiveInt(50)).annotate({
+    description: "Maximum recent runs to return, from 1 to 50.",
+  }),
+  maxCharsPerItem: Schema.optional(clampedPositiveInt(50_000)).annotate({
+    description: "Maximum text characters per item, from 1 to 50000.",
+  }),
 });
 export type OrchestratorMcpThreadReadInput = typeof OrchestratorMcpThreadReadInput.Type;
 
