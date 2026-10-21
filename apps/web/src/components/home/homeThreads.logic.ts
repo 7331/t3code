@@ -9,7 +9,8 @@ import { filterSidebarV2VisibleThreads } from "../Sidebar.logic";
 
 /** Each card holds a live subscription to its thread's detail stream, so Home stays a handful. */
 export const HOME_MAX_CARDS = 6;
-const HOME_CARD_MESSAGE_LIMIT = 6;
+/** Home is for glancing across threads, so a card previews only the last few messages. */
+const HOME_CARD_MESSAGE_LIMIT = 3;
 
 type HomeThreadInput = Pick<
   EnvironmentThreadShell,
@@ -106,4 +107,13 @@ export function homeCardThreadActions(input: {
     pin: topLevel && input.supportsPinning,
     settle: topLevel && input.supportsSettlement,
   };
+}
+
+/** A card's second line: project, branch and the model its next reply uses, skipping missing parts. */
+export function homeCardSubtitle(parts: {
+  readonly projectTitle: string | null | undefined;
+  readonly branch: string | null;
+  readonly modelLabel: string;
+}): string {
+  return [parts.projectTitle, parts.branch, parts.modelLabel].filter(Boolean).join(" · ");
 }

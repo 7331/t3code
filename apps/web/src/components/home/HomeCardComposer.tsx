@@ -23,16 +23,9 @@ import {
 } from "../../composer-logic";
 import { EMPTY_COMPOSER_CONTEXT_RECORDS } from "../composerContextPresentation";
 import { useComposerDraftStore, useComposerThreadDraft } from "../../composerDraftStore";
-import { useClientSettings, useEnvironmentSettings } from "../../hooks/useSettings";
+import { useClientSettings } from "../../hooks/useSettings";
 import { useTheme } from "../../hooks/useTheme";
 import { newMessageId } from "~/lib/utils";
-import { getCustomModelOptionsByInstance } from "../../modelSelection";
-import {
-  applyProviderInstanceSettings,
-  deriveProviderInstanceEntries,
-} from "../../providerInstances";
-import { useEnvironmentProviders } from "../../state/environments";
-import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import { useEnvironmentScope } from "../../state/session";
 import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
@@ -51,6 +44,7 @@ import {
   stepHomeCardMenuHighlight,
   type HomeCardMenuItem,
 } from "./homeCardComposer.logic";
+import type { HomeCardModel } from "./useHomeCardModel";
 
 const NO_SKILLS: ReadonlyArray<never> = [];
 /** Only feeds the menu hook while the thread's provider is unknown; it then has no skills to list. */
@@ -70,15 +64,15 @@ export function HomeCardComposer({
   threadRef,
   cwd,
   hint,
+  model,
 }: {
   readonly thread: EnvironmentThreadShell;
   readonly threadRef: ScopedThreadRef;
   readonly cwd: string | null;
   readonly hint: string | null;
+  readonly model: HomeCardModel;
 }) {
-  const settings = useEnvironmentSettings(thread.environmentId);
   const sendShortcut = useClientSettings((clientSettings) => clientSettings.sendShortcut);
-  const providers = useEnvironmentProviders().get(thread.environmentId) ?? EMPTY_SERVER_PROVIDERS;
   const { resolvedTheme } = useTheme();
   const draft = useComposerThreadDraft(threadRef);
   const setPrompt = useComposerDraftStore((store) => store.setPrompt);
@@ -96,13 +90,8 @@ export function HomeCardComposer({
   const editorRef = useRef<ComposerPromptEditorHandle>(null);
   const listId = `${useId()}-suggestions`;
 
+  const { settings, entry, draftModel, slug: shownModel, modelOptions } = model;
   const instanceId = thread.modelSelection.instanceId;
-  const entry =
-    applyProviderInstanceSettings(
-      deriveProviderInstanceEntries(providers),
-      settings,
-      thread.projectId,
-    ).find((candidate) => candidate.instanceId === instanceId) ?? null;
   const skills = entry?.snapshot ? resolveProviderSkillsForCwd(entry.snapshot, cwd) : NO_SKILLS;
   const slashCommands = entry?.snapshot
     ? resolveProviderSlashCommandsForCwd(entry.snapshot, cwd)
@@ -124,9 +113,6 @@ export function HomeCardComposer({
   });
   const items = menu.items.filter(isHomeCardMenuItem);
   const activeItem = items.find((item) => item.id === highlightedId) ?? items[0] ?? null;
-  const draftModel = draft.modelSelectionByProvider[instanceId];
-  const shownModel = draftModel?.model ? draftModel.model : thread.modelSelection.model;
-  const modelOptions = getCustomModelOptionsByInstance(settings, providers, instanceId, shownModel);
   // The card sends text only; a draft holding attachments or context goes out from the thread.
   const draftHasExtras =
     draft.images.length +

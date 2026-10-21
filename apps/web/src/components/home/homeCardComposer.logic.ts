@@ -67,3 +67,13 @@ export function homeCardSendModelSelection(
   if (draftSelection.instanceId !== threadSelection.instanceId) return undefined;
   return draftSelection.model === threadSelection.model ? undefined : draftSelection;
 }
+
+/** The model a card's next reply runs on: the draft's pick for the thread's instance, else the thread's. */
+export function homeCardModelSlug(
+  threadSelection: ModelSelection,
+  draftSelection: ModelSelection | undefined,
+): string {
+  return draftSelection?.instanceId === threadSelection.instanceId && draftSelection.model
+    ? draftSelection.model
+    : threadSelection.model;
+}

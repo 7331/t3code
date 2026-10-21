@@ -29,13 +29,20 @@ import { useUiStateStore } from "~/uiStateStore";
 import { AnimatedHeight } from "../AnimatedHeight";
 import ChatMarkdown from "../ChatMarkdown";
 import { ProjectFavicon } from "../ProjectFavicon";
-import { resolveThreadLastVisitedAt, resolveThreadStatusPill } from "../Sidebar.logic";
-import { ThreadStatusLabel, ThreadWorktreeIndicator } from "../ThreadStatusIndicators";
+import {
+  hasUnseenCompletion,
+  resolveSidebarRowStatus,
+  resolveSidebarThreadStatus,
+  resolveThreadLastVisitedAt,
+} from "../Sidebar.logic";
+import { SidebarRowStatusIconView } from "../sidebar/SidebarRowStatusIcon";
+import { ThreadWorktreeIndicator } from "../ThreadStatusIndicators";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HomeCardComposer } from "./HomeCardComposer";
 import { threadRelationshipStatusLabel } from "../chat/ThreadRelationshipIcon";
-import { latestHomeCardMessages } from "./homeThreads.logic";
+import { homeCardSubtitle, latestHomeCardMessages } from "./homeThreads.logic";
+import { useHomeCardModel } from "./useHomeCardModel";
 import { subagentStatusTone } from "./subagentBoard.logic";
 
 interface CardToggle {
@@ -78,16 +85,23 @@ export function HomeThreadCard({
   const localLastVisitedAt = useUiStateStore(
     (state) => state.threadLastVisitedAtById[scopedThreadKey(threadRef)],
   );
-  const status = resolveThreadStatusPill({
-    thread: {
+  const model = useHomeCardModel(thread, threadRef);
+  // The sidebar row's own wording; snooze wake-ups ("Woke") stay a sidebar affordance.
+  const status = resolveSidebarRowStatus({
+    status: resolveSidebarThreadStatus(thread),
+    goalActive: thread.goal?.status === "active",
+    isWoke: false,
+    isUnread: hasUnseenCompletion({
       ...thread,
       lastVisitedAt: resolveThreadLastVisitedAt(thread.lastVisitedAt, localLastVisitedAt),
-    },
+    }),
   });
   const routeParams = buildThreadRouteParams(threadRef);
-  const subtitle = [project?.title, thread.branch, thread.modelSelection.model]
-    .filter(Boolean)
-    .join(" · ");
+  const subtitle = homeCardSubtitle({
+    projectTitle: project?.title,
+    branch: thread.branch,
+    modelLabel: model.label,
+  });
   const cwd = thread.worktreePath ?? project?.workspaceRoot ?? null;
 
   return (
@@ -110,8 +124,15 @@ export function HomeThreadCard({
             {subagentStatus !== undefined ? (
               <SubagentStatusLabel status={subagentStatus} />
             ) : status ? (
-              // Several cards can be working at once; a still dot keeps Home from repainting.
-              <ThreadStatusLabel status={{ ...status, pulse: false }} />
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 text-xs font-medium",
+                  status.className,
+                )}
+              >
+                <SidebarRowStatusIconView icon={status.icon} className="size-3.5" />
+                {status.label}
+              </span>
             ) : null}
           </div>
           {/* Always one line tall, so cards keep their height when a subtitle part is missing. */}
@@ -151,9 +172,15 @@ export function HomeThreadCard({
           <>
             <HomeCardTranscript threadRef={threadRef} cwd={cwd ?? undefined} />
             {readOnly ? (
-              <HomeCardProviderSubagentFooter thread={thread} threadRef={threadRef} />
+              <HomeCardProviderSubagentFooter threadRef={threadRef} modelLabel={model.label} />
             ) : (
-              <HomeCardComposer thread={thread} threadRef={threadRef} cwd={cwd} hint={replyHint} />
+              <HomeCardComposer
+                thread={thread}
+                threadRef={threadRef}
+                cwd={cwd}
+                hint={replyHint}
+                model={model}
+              />
             )}
           </>
         )}
@@ -162,22 +189,21 @@ export function HomeThreadCard({
   );
 }
 
-const SUBAGENT_TONE_CLASSES = {
-  active: { text: "text-sky-600 dark:text-sky-300/80", dot: "bg-sky-500 dark:bg-sky-300/80" },
-  done: {
-    text: "text-emerald-600 dark:text-emerald-300/90",
-    dot: "bg-emerald-500 dark:bg-emerald-300/90",
-  },
-  failed: { text: "text-red-600 dark:text-red-300/90", dot: "bg-red-500 dark:bg-red-300/90" },
-  muted: { text: "text-muted-foreground", dot: "bg-muted-foreground" },
+const SUBAGENT_TONES = {
+  active: { icon: "working", className: "text-info" },
+  done: { icon: "done", className: "text-success" },
+  failed: { icon: "failed", className: "text-error" },
+  muted: { icon: "waiting", className: "text-muted-foreground" },
 } as const;
 
-/** The Lineage panel's word for a subagent's status, with a still dot in the sidebar's colours. */
+/** The Lineage panel's word for a subagent's status, drawn like a sidebar row's status. */
 function SubagentStatusLabel({ status }: { readonly status: string | null }) {
-  const tone = SUBAGENT_TONE_CLASSES[subagentStatusTone(status)];
+  const tone = SUBAGENT_TONES[subagentStatusTone(status)];
   return (
-    <span className={cn("inline-flex shrink-0 items-center gap-1 text-3xs", tone.text)}>
-      <span className={cn("size-1.5 rounded-full", tone.dot)} />
+    <span
+      className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-medium", tone.className)}
+    >
+      <SidebarRowStatusIconView icon={tone.icon} className="size-3.5" />
       {threadRelationshipStatusLabel(status)}
     </span>
   );
@@ -263,7 +289,7 @@ function HomeCardMessages({
     <div
       ref={bodyRef}
       className={cn(
-        "flex max-h-72 flex-col justify-end overflow-hidden px-4 py-3",
+        "flex max-h-56 flex-col justify-end overflow-hidden px-4 py-3",
         clipped && "[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]",
       )}
     >
@@ -294,11 +320,11 @@ function HomeCardMessages({
 }
 
 function HomeCardProviderSubagentFooter({
-  thread,
   threadRef,
+  modelLabel,
 }: {
-  readonly thread: EnvironmentThreadShell;
   readonly threadRef: ScopedThreadRef;
+  readonly modelLabel: string;
 }) {
   const projection = useThreadProjection(threadRef)?.projection ?? null;
   const status = projection === null ? null : deriveProviderSubagentStatus(projection);
@@ -311,7 +337,7 @@ function HomeCardProviderSubagentFooter({
     <div className="flex items-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
       <BotIcon className="size-3.5 shrink-0" />
       <span className="truncate">
-        {statusLabel} · {thread.modelSelection.model}
+        {statusLabel} · {modelLabel}
       </span>
       <span className="ms-auto shrink-0">Run by the provider; reply in the parent</span>
     </div>

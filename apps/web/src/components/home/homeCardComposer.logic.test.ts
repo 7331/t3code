@@ -5,6 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 import type { ComposerTrigger } from "../../composer-logic";
 import {
   applyHomeCardMenuItem,
+  homeCardModelSlug,
   homeCardSendModelSelection,
   stepHomeCardMenuHighlight,
   type HomeCardMenuItem,
@@ -80,5 +81,21 @@ describe("homeCardSendModelSelection", () => {
   it("ignores a draft pick for another provider instance", () => {
     const other = createModelSelection(ProviderInstanceId.make("claudeAgent"), "claude-haiku-5-5");
     expect(homeCardSendModelSelection(thread, other)).toBeUndefined();
+  });
+});
+
+describe("homeCardModelSlug", () => {
+  const codex = ProviderInstanceId.make("codex");
+  const thread = createModelSelection(codex, "gpt-6-astra");
+
+  it("names the draft's pick for the thread's instance, which is what the next reply uses", () => {
+    expect(homeCardModelSlug(thread, createModelSelection(codex, "gpt-6-luna"))).toBe("gpt-6-luna");
+  });
+
+  it("falls back to the thread's model", () => {
+    expect(homeCardModelSlug(thread, undefined)).toBe("gpt-6-astra");
+    expect(
+      homeCardModelSlug(thread, createModelSelection(ProviderInstanceId.make("other"), "x")),
+    ).toBe("gpt-6-astra");
   });
 });

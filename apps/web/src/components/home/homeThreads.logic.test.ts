@@ -5,6 +5,7 @@ import { makeStreamingTimelineFixture, makeThreadFixture } from "../../test-fixt
 import {
   HOME_MAX_CARDS,
   homeCardSpansFullWidth,
+  homeCardSubtitle,
   homeCardThreadActions,
   latestHomeCardMessages,
   selectHomeThreads,
@@ -79,7 +80,7 @@ describe("latestHomeCardMessages", () => {
   it("keeps the latest user and assistant messages in order and drops tool work", () => {
     const { visibleTurnItems } = makeStreamingTimelineFixture("Working on it");
 
-    expect(latestHomeCardMessages(visibleTurnItems)).toEqual([
+    expect(latestHomeCardMessages(visibleTurnItems, 4)).toEqual([
       { id: "history-user-item", role: "user", text: "Inspect", streaming: false },
       { id: "history-assistant-item", role: "assistant", text: "Done", streaming: false },
       { id: "live-user-item", role: "user", text: "Continue", streaming: false },
@@ -156,5 +157,28 @@ describe("homeCardThreadActions", () => {
         supportsSettlement: true,
       }),
     ).toEqual({ pin: false, settle: true });
+  });
+});
+
+describe("latestHomeCardMessages default", () => {
+  it("previews only the last three messages", () => {
+    const { visibleTurnItems } = makeStreamingTimelineFixture("Working on it");
+
+    expect(latestHomeCardMessages(visibleTurnItems).map((message) => message.id)).toEqual([
+      "history-assistant-item",
+      "live-user-item",
+      "live-assistant-item",
+    ]);
+  });
+});
+
+describe("homeCardSubtitle", () => {
+  it("joins project, branch and model, skipping what a thread lacks", () => {
+    expect(
+      homeCardSubtitle({ projectTitle: "Desktop", branch: "feat/home", modelLabel: "GPT-6-Luna" }),
+    ).toBe("Desktop · feat/home · GPT-6-Luna");
+    expect(
+      homeCardSubtitle({ projectTitle: "Desktop", branch: null, modelLabel: "GPT-6-Luna" }),
+    ).toBe("Desktop · GPT-6-Luna");
   });
 });

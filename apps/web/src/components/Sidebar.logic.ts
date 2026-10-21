@@ -867,6 +867,55 @@ export type SidebarThreadStatus =
   | "limited"
   | "ready";
 
+export type SidebarRowStatusIcon =
+  | "working"
+  | "waiting"
+  | "approval"
+  | "input"
+  | "failed"
+  | "woke"
+  | "done";
+
+export interface SidebarRowStatus {
+  readonly label: string;
+  readonly icon: SidebarRowStatusIcon;
+  readonly className: string;
+}
+
+/** The word and tone a thread row leads with; Home cards use the same so the two never disagree. */
+export function resolveSidebarRowStatus(input: {
+  readonly status: SidebarThreadStatus;
+  readonly goalActive: boolean;
+  readonly isWoke: boolean;
+  readonly isUnread: boolean;
+}): SidebarRowStatus | null {
+  switch (input.status) {
+    case "working":
+      return {
+        label: input.goalActive ? "Goal" : "Working",
+        icon: "working",
+        className: "text-info",
+      };
+    case "waiting":
+      return { label: "Waiting", icon: "waiting", className: "text-muted-foreground" };
+    case "approval":
+      return { label: "Approval", icon: "approval", className: "text-warning-foreground" };
+    case "input":
+      return {
+        label: "Input",
+        icon: "input",
+        className: "text-indigo-600 dark:text-indigo-300",
+      };
+    case "limited":
+      return { label: "Limited", icon: "failed", className: "text-warning" };
+    case "failed":
+      return { label: "Failed", icon: "failed", className: "text-error" };
+    case "ready":
+      if (input.isWoke) return { label: "Woke", icon: "woke", className: "text-warning" };
+      return input.isUnread ? { label: "Done", icon: "done", className: "text-success" } : null;
+  }
+}
+
 export function shouldRecedeSidebarThread(input: {
   status: SidebarThreadStatus;
   isUnread: boolean;
