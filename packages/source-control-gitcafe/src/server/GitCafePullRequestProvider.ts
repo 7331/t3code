@@ -557,8 +557,14 @@ export const make = Effect.gen(function* () {
             : yield* lineStats(input, { version: pull.version, headOid: pull.headOid }).pipe(
                 Effect.orElseSucceed(() => null),
               );
+        // A count that could not be read is absent rather than zero.
+        const {
+          additions: _additions,
+          deletions: _deletions,
+          ...summary
+        } = Json.toChangeRequest(pull, input);
         return {
-          ...Json.toChangeRequest(pull, input),
+          ...summary,
           ...(changes === null ? {} : changes),
           closedAt: pull.closedAt,
           mergedAt: pull.mergedAt,
