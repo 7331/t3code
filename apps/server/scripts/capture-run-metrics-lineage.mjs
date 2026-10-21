@@ -771,6 +771,9 @@ for (const id of [
           return {
             sequence: yield* es.latestSequence(),
             threads: yield* Effect.all(rr.map((r) => ps.getThread(r.threadId))),
+            runs: yield* sql`SELECT * FROM orchestration_v2_projection_runs ORDER BY run_id`,
+            metadata:
+              yield* sql`SELECT * FROM orchestration_v2_projection_metadata ORDER BY projection_name`,
           };
         });
       const beforeState = yield* state();
