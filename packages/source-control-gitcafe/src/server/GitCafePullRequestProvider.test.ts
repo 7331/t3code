@@ -547,36 +547,45 @@ describe("GitCafePullRequestProvider", () => {
     }).pipe(Effect.provide(server.layer));
   });
 
-  it.effect("summarizes line counts once per head commit", () => {
-    const snapshot = { version: 4, headOid, comparisonBaseOid: baseOid };
+  it.effect("recounts summary lines only when the compared commits move", () => {
+    const landedBase = "fedcba9876543210fedcba9876543210fedcba98";
+    let comparisonBaseOid = baseOid;
     let pullReads = 0;
     const server = fakeGitCafe({
-      // A comment moves the version without moving the head.
+      // A comment moves the version without moving the compared commits.
       "GET /repos/owner/repo/pulls/7": () => ({ ...pull, version: 4 + pullReads++ }),
-      "GET /repos/owner/repo/pulls/7/changes": {
-        ...snapshot,
+      "GET /repos/owner/repo/pulls/7/changes": () => ({
+        version: 4,
+        headOid,
+        comparisonBaseOid,
         items: [{ path: "a.ts" }, { path: "b.ts" }],
         next: null,
-      },
+      }),
       "POST /repos/owner/repo/pulls/7/diff-files": (request: SentRequest) => ({
-        ...snapshot,
+        version: 4,
+        headOid,
+        comparisonBaseOid,
         items: (request.body as { paths: ReadonlyArray<string> }).paths.map((path) => ({
           path,
-          additions: 3,
+          additions: comparisonBaseOid === baseOid ? 3 : 1,
           deletions: 1,
         })),
       }),
     });
+    const hunkReads = () =>
+      server.sent.filter((request) => request.path.endsWith("/diff-files")).length;
     return Effect.gen(function* () {
       const provider = yield* GitCafePullRequestProvider.make;
       const first = yield* provider.getChangeRequestSummary!(target);
       const second = yield* provider.getChangeRequestSummary!(target);
       assert.deepInclude(first, { additions: 6, deletions: 2, changedFiles: 2 });
       assert.deepInclude(second, { additions: 6, deletions: 2, changedFiles: 2 });
-      assert.lengthOf(
-        server.sent.filter((request) => request.path.endsWith("/changes")),
-        1,
-      );
+      assert.strictEqual(hunkReads(), 1);
+      // A landed parent layer moves the comparison base under the same head.
+      comparisonBaseOid = landedBase;
+      const third = yield* provider.getChangeRequestSummary!(target);
+      assert.deepInclude(third, { additions: 2, deletions: 2, changedFiles: 2 });
+      assert.strictEqual(hunkReads(), 2);
     }).pipe(Effect.provide(server.layer));
   });
 

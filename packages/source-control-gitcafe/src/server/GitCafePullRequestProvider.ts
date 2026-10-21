@@ -355,6 +355,11 @@ export const make = Effect.gen(function* () {
       return yield* failure(operation, `GitCafe's stack operation ${outcome.state}.`);
   });
 
+  // GitCafe's pulls carry no line totals, and linked pull requests are summarized every minute,
+  // so hunk totals are held per compared pair of commits. The file list that names the pair is
+  // cheap; a retarget or a landed parent layer moves the base without moving the head.
+  const lineTotals = new Map<string, { readonly additions: number; readonly deletions: number }>();
+
   const readLineStats = Effect.fn("GitCafePullRequestProvider.readLineStats")(function* (
     input: PullRef,
     version: number,
@@ -382,44 +387,33 @@ export const make = Effect.gen(function* () {
       after = batch.next;
       if (after === null || after === previous || batch.items.length === 0) break;
     }
-    const counted =
-      files.some((file) => file.additions !== undefined) ||
-      files.length > LINE_STATS_MAX_FILES ||
-      revision === undefined
-        ? files
-        : (yield* Effect.forEach(
+    if (revision === undefined) return { changedFiles: 0, additions: 0, deletions: 0 };
+    const key = `${input.host} ${input.repository.toLowerCase()} ${input.number} ${revision.baseOid} ${revision.headOid}`;
+    const held = lineTotals.get(key);
+    if (held !== undefined) return { changedFiles: files.length, ...held };
+    const details =
+      files.some((file) => file.additions !== undefined) || files.length > LINE_STATS_MAX_FILES
+        ? Option.some(files)
+        : yield* Effect.forEach(
             chunk(detailablePaths(files), DIFF_FILES_BATCH),
             (paths) => readDiffFiles(input, revision, paths),
             { concurrency: 4 },
-          )).flat();
-    return {
-      changedFiles: files.length,
+          ).pipe(
+            Effect.map((batches) => batches.flat()),
+            Effect.option,
+          );
+    // Unread hunks leave the lines unknown rather than zero; the file count still stands.
+    if (Option.isNone(details)) return { changedFiles: files.length };
+    const counted = details.value;
+    const totals = {
       additions: counted.reduce((total, file) => total + (file.additions ?? 0), 0),
       deletions: counted.reduce((total, file) => total + (file.deletions ?? 0), 0),
     };
+    if (lineTotals.size >= LINE_STATS_CACHE_SIZE)
+      lineTotals.delete(lineTotals.keys().next().value!);
+    lineTotals.set(key, totals);
+    return { changedFiles: files.length, ...totals };
   });
-
-  // GitCafe's pulls carry no line totals, and linked pull requests are summarized every minute,
-  // so totals are held per head commit rather than recounted from hunks on every read. The
-  // pull's version also moves on comments and reviews, which change no lines.
-  const lineStatsByHead = new Map<string, Effect.Success<ReturnType<typeof readLineStats>>>();
-  const lineStats = (
-    input: PullRef,
-    pull: { readonly version: number; readonly headOid: string },
-  ) => {
-    const key = `${input.host} ${input.repository.toLowerCase()} ${input.number} ${pull.headOid}`;
-    const held = lineStatsByHead.get(key);
-    if (held !== undefined) return Effect.succeed(held);
-    return readLineStats(input, pull.version).pipe(
-      Effect.tap((stats) =>
-        Effect.sync(() => {
-          if (lineStatsByHead.size >= LINE_STATS_CACHE_SIZE)
-            lineStatsByHead.delete(lineStatsByHead.keys().next().value!);
-          lineStatsByHead.set(key, stats);
-        }),
-      ),
-    );
-  };
 
   const merge = Effect.fn("GitCafePullRequestProvider.merge")(function* (
     input: Parameters<PullRequestProviderApi["runAction"]>[0],
@@ -554,9 +548,7 @@ export const make = Effect.gen(function* () {
         const changes =
           pull.headOid === null
             ? null
-            : yield* lineStats(input, { version: pull.version, headOid: pull.headOid }).pipe(
-                Effect.orElseSucceed(() => null),
-              );
+            : yield* readLineStats(input, pull.version).pipe(Effect.orElseSucceed(() => null));
         // A count that could not be read is absent rather than zero.
         const {
           additions: _additions,
@@ -588,9 +580,7 @@ export const make = Effect.gen(function* () {
               ),
           pull.headOid === null
             ? Effect.succeed(null)
-            : lineStats(input, { version: pull.version, headOid: pull.headOid }).pipe(
-                Effect.orElseSucceed(() => null),
-              ),
+            : readLineStats(input, pull.version).pipe(Effect.orElseSucceed(() => null)),
         ],
         { concurrency: 3 },
       );
