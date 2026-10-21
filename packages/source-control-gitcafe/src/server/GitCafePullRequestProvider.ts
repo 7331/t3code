@@ -260,7 +260,9 @@ export const make = Effect.gen(function* () {
 
   /**
    * GitCafe replaces a pull request's whole reviewer or label list, so one toggle reads the
-   * list, changes it, and writes it back fenced on the pull request's version.
+   * list, changes it, and writes it back fenced on the pull request's version. The version is
+   * read first: a change landing between the two reads then fails the fence instead of being
+   * overwritten.
    */
   const toggleListed = Effect.fn("GitCafePullRequestProvider.toggleListed")(function* (
     operation: string,
@@ -270,10 +272,8 @@ export const make = Effect.gen(function* () {
     on: boolean,
   ) {
     const path = yield* pullPath(operation, input);
-    const [pull, listed] = yield* Effect.all(
-      [readPull(operation, input), readPages(operation, input, `${path}/${list.name}`, Listed)],
-      { concurrency: 2 },
-    );
+    const pull = yield* readPull(operation, input);
+    const listed = yield* readPages(operation, input, `${path}/${list.name}`, Listed);
     const current = listed.items.map((item) => item.id);
     const next = on
       ? [...new Set([...current, ...ids])]
@@ -589,7 +589,14 @@ export const make = Effect.gen(function* () {
           pull.headOid === null
             ? Effect.succeed(null)
             : readLineStats(input, pull.version).pipe(Effect.orElseSucceed(() => null)),
-          readPages("getChangeRequest", input, `${path}/reviewers`, Json.GitCafeActorEntries),
+          // Reviewers need `pr:review:read`, which a contents-only token lacks.
+          readPages("getChangeRequest", input, `${path}/reviewers`, Json.GitCafeActorEntries).pipe(
+            Effect.catch((error) =>
+              error.reason === "unauthenticated" || error.reason === "rate-limited"
+                ? Effect.fail(error)
+                : Effect.succeed({ items: [], next: null }),
+            ),
+          ),
           readPages("getChangeRequest", input, `${path}/labels`, Json.GitCafeLabels),
         ],
         { concurrency: 5 },

@@ -512,6 +512,23 @@ describe("GitCafePullRequestProvider", () => {
     }).pipe(Effect.provide(server.layer));
   });
 
+  it.effect("still reads a pull request whose reviewers the token may not see", () => {
+    const server = fakeGitCafe({
+      "GET /repos/owner/repo/pulls/7": { ...pull, headOid: null },
+      "GET /repos/owner/repo/pulls/7/labels": { items: [labels[0]], next: null },
+      "GET /repos/owner/repo/pulls/7/status": {
+        merge: { conflicts: "unknown", fastForward: null, strategies: [] },
+        checks: { pending: 0, failing: 0, total: 0 },
+      },
+    });
+    return Effect.gen(function* () {
+      const provider = yield* GitCafePullRequestProvider.make;
+      const detail = yield* provider.getChangeRequest(target);
+      assert.deepStrictEqual(detail.reviewers, []);
+      assert.deepStrictEqual(detail.labels, [{ name: "bug", color: "#d73a4a" }]);
+    }).pipe(Effect.provide(server.layer));
+  });
+
   it.effect("requests and withdraws reviewers by rewriting the whole list", () => {
     const bob = { ...actor, actorId: "act_two", handle: "bob" };
     let requested = [{ id: "act_two", actor: bob }];
