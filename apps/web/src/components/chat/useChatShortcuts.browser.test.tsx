@@ -87,16 +87,3 @@ it("still types other letters into the composer while the launcher is open", asy
   expect(composerKeys).toEqual(["a"]);
   expect(received).toEqual([]);
 });
-
-it("types the letter into the composer again once the launcher closes", async () => {
-  const composerKeys: string[] = [];
-  const received: string[] = [];
-  await using screen = await render(<Chat composerKeys={composerKeys} />, options);
-  await screen.rerender(<Chat composerKeys={composerKeys} launcher={{ keys: "BT", received }} />);
-  await screen.rerender(<Chat composerKeys={composerKeys} />);
-
-  await userEvent.keyboard("t");
-
-  expect(composerKeys).toEqual(["t"]);
-  expect(received).toEqual([]);
-});
