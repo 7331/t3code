@@ -124,6 +124,22 @@ device keeps its own choice.
 While this is on, the active list is ordered by when each thread last came back to you, so you
 cannot drag or move threads within it. Your saved order returns when you turn it off.
 
+## Watch several threads at once
+
+On web and desktop, **Home** shows your pinned threads as cards, so you can follow several
+projects without switching threads. Open it from the **T3 Code** wordmark at the top of the
+sidebar, or with **Open home** in the command palette. With nothing pinned, Home shows the latest
+thread that has messages in each project.
+
+Each card shows the thread's last few messages and a reply field with its own model picker.
+Replies use the thread's draft, so text you start on a card is waiting when you open the thread,
+and a reply to a running thread follows your follow-up setting. Attachments and context still go
+through the thread's own composer. Collapsing a card is remembered on this device.
+
+To see a thread's subagents side by side, open the thread's details and choose **Subagents** under
+**Lineage**. You can reply to subagents that T3 Code started. Subagents a provider runs itself are
+read-only, and their questions are asked on the parent thread.
+
 ## Settle finished work
 
 Choose **Settle thread** from its menu to move finished work out of the active list
