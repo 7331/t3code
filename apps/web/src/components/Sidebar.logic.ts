@@ -867,6 +867,48 @@ export type SidebarThreadStatus =
   | "limited"
   | "ready";
 
+export type SidebarRowStatusIcon =
+  | "working"
+  | "waiting"
+  | "approval"
+  | "input"
+  | "failed"
+  | "woke"
+  | "done";
+
+export interface SidebarRowStatus {
+  readonly label: string;
+  readonly icon: SidebarRowStatusIcon;
+  readonly className: string;
+}
+
+const SIDEBAR_ROW_STATUS_PRESENTATION = {
+  working: { label: "Working", icon: "working", className: "text-info" },
+  waiting: { label: "Waiting", icon: "waiting", className: "text-muted-foreground" },
+  approval: { label: "Approval", icon: "approval", className: "text-warning-foreground" },
+  input: { label: "Input", icon: "input", className: "text-indigo-600 dark:text-indigo-300" },
+  limited: { label: "Limited", icon: "failed", className: "text-warning" },
+  failed: { label: "Failed", icon: "failed", className: "text-error" },
+  woke: { label: "Woke", icon: "woke", className: "text-warning" },
+  done: { label: "Done", icon: "done", className: "text-success" },
+} as const satisfies Record<SidebarV2TopStatusKind, SidebarRowStatus>;
+
+/**
+ * The word, glyph and tone a thread row leads with, for the status `resolveSidebarV2TopStatus`
+ * picks. Home cards draw the same, so the two never disagree.
+ */
+export function resolveSidebarRowStatus(input: {
+  readonly status: SidebarThreadStatus;
+  readonly goalActive: boolean;
+  readonly isWoke: boolean;
+  readonly isUnread: boolean;
+}): SidebarRowStatus | null {
+  const kind = resolveSidebarV2TopStatus(input);
+  if (kind === null) return null;
+  const presentation = SIDEBAR_ROW_STATUS_PRESENTATION[kind];
+  return kind === "working" && input.goalActive ? { ...presentation, label: "Goal" } : presentation;
+}
+
 export function shouldRecedeSidebarThread(input: {
   status: SidebarThreadStatus;
   isUnread: boolean;

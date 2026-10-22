@@ -100,18 +100,29 @@ export function SidebarBrandWidthProbe({
   );
 }
 
+/** The wordmark opens Home; starting a new draft lives on the "New thread" button. */
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   return (
-    <Link
-      aria-label="Go to threads"
-      className={cn(
-        "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
-        onBackdrop ? "text-white" : "text-foreground",
-      )}
-      to="/"
-    >
-      <SidebarBrandMark onBackdrop={onBackdrop} />
-    </Link>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Link
+            aria-label="Home"
+            activeProps={{ "aria-current": "page" }}
+            className={cn(
+              "relative z-10 ml-[calc(var(--workspace-titlebar-content-left)-0.375rem)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md px-1.5 outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset md:flex",
+              onBackdrop
+                ? "text-white hover:bg-white/12 aria-[current=page]:bg-white/16"
+                : "text-foreground hover:bg-accent aria-[current=page]:bg-accent",
+            )}
+            to="/home"
+          />
+        }
+      >
+        <SidebarBrandMark onBackdrop={onBackdrop} />
+      </TooltipTrigger>
+      <TooltipPopup side="bottom">Home</TooltipPopup>
+    </Tooltip>
   );
 }
 

@@ -9,6 +9,7 @@ import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environ
 import {
   deriveWorkflowGroups,
   projectedSubagentsToRuntime,
+  workflowStatusByChildThreadId,
   type RuntimeSubagent,
 } from "@t3tools/client-runtime/state/subagentRuntime";
 import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
@@ -17,6 +18,7 @@ import {
   deriveThreadRelationshipGraph,
   immediateThreadRelationships,
   isParentThreadRelationship,
+  isSettledSubagentStatus,
   threadRelationshipRowStatus,
   orderWebThreadLineageRows,
   resolveMergeBackTargetThreadId,
@@ -37,6 +39,7 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import { deriveSubagentElapsedMs } from "@t3tools/shared/orchestrationTiming";
+import { selectSubagentBoardChildren } from "../home/subagentBoard.logic";
 import { groupBy } from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import { useNavigate } from "@tanstack/react-router";
@@ -45,6 +48,7 @@ import {
   BotIcon,
   CornerLeftUpIcon,
   GitForkIcon,
+  LayoutGridIcon,
   LoaderCircleIcon,
   MoreHorizontalIcon,
   PlusIcon,
@@ -279,6 +283,7 @@ export function ThreadRelationshipsPanel(props: {
   const workflowGroupsById = new Map(
     deriveWorkflowGroups(runtimeSubagents).map((group) => [group.workflow.id, group]),
   );
+  const workflowStatuses = workflowStatusByChildThreadId(projected);
   const shells: ReadonlyArray<OrchestrationV2ThreadShell> = [
     ...relationshipShells,
     ...(archivedShells ?? []),
@@ -293,14 +298,13 @@ export function ThreadRelationshipsPanel(props: {
     currentThreadId: props.threadId,
     mergeTargetThreadId,
   }).map((row) => {
-    const agent =
+    const workflowStatus =
       row.edge.kind === "subagent" && !isParentThreadRelationship(row.edge, props.threadId)
-        ? subagentsByThreadId.get(row.threadId)
+        ? workflowStatuses.get(row.threadId)
         : undefined;
-    const workflowGroup = agent === undefined ? undefined : workflowGroupsById.get(agent.id);
-    return workflowGroup === undefined
+    return workflowStatus === undefined
       ? row
-      : { ...row, edge: { ...row.edge, status: workflowGroup.workflow.status } };
+      : { ...row, edge: { ...row.edge, status: workflowStatus } };
   });
   const canMerge = mergeTargetThreadId !== null && latestMergeBackRun !== null;
   const canDetach = projection ? canDetachThreadProviderSession(projection) : false;
@@ -312,12 +316,15 @@ export function ThreadRelationshipsPanel(props: {
   } = groupBy(relationshipRows, ({ edge }) => {
     if (edge.kind !== "subagent" || isParentThreadRelationship(edge, props.threadId))
       return "related";
-    return ["completed", "failed", "error", "cancelled", "interrupted", "idle"].includes(
-      edge.status ?? "",
-    )
-      ? "previous"
-      : "active";
+    return isSettledSubagentStatus(edge.status) ? "previous" : "active";
   });
+  // The board shows live subagent threads only, so the button waits for one it can show.
+  const board = selectSubagentBoardChildren({
+    graph: deriveThreadRelationshipGraph({ threads: relationshipShells, projection }),
+    parentThreadId: props.threadId,
+    statusOverrides: workflowStatuses,
+  });
+  const hasSubagentChildren = board.total > 0;
   const groups = [
     { id: "related", label: null, rows: related, expanded: true },
     { id: "active", label: null, rows: active, expanded: true },
@@ -404,28 +411,49 @@ export function ThreadRelationshipsPanel(props: {
       title={runningCount > 0 ? `Lineage · ${runningCount} running` : "Lineage"}
       data-thread-relationships-panel
       actions={
-        canDetach ? (
-          <Menu>
-            <MenuTrigger
-              render={
-                <ThreadDetailsControl
-                  size="icon-xs"
-                  variant="ghost"
-                  part="icon"
-                  aria-label="More thread actions"
-                  disabled={busyAction !== null}
-                />
-              }
-            >
-              <MoreHorizontalIcon className="size-3.5" />
-            </MenuTrigger>
-            <MenuPopup align="end" className="min-w-60 max-w-(--available-width)">
-              <MenuItem onClick={() => void detach()}>
-                <UnplugIcon className="size-3.5" />
-                Disconnect agent session
-              </MenuItem>
-            </MenuPopup>
-          </Menu>
+        hasSubagentChildren || canDetach ? (
+          <>
+            {hasSubagentChildren ? (
+              <ThreadDetailsControl
+                part="meta"
+                onClick={() =>
+                  void navigate({
+                    to: "/home",
+                    search: {
+                      parentEnvironmentId: props.environmentId,
+                      parentThreadId: props.threadId,
+                    },
+                  })
+                }
+              >
+                <LayoutGridIcon className="size-3.5" />
+                Subagents
+              </ThreadDetailsControl>
+            ) : null}
+            {canDetach ? (
+              <Menu>
+                <MenuTrigger
+                  render={
+                    <ThreadDetailsControl
+                      size="icon-xs"
+                      variant="ghost"
+                      part="icon"
+                      aria-label="More thread actions"
+                      disabled={busyAction !== null}
+                    />
+                  }
+                >
+                  <MoreHorizontalIcon className="size-3.5" />
+                </MenuTrigger>
+                <MenuPopup align="end" className="min-w-60 max-w-(--available-width)">
+                  <MenuItem onClick={() => void detach()}>
+                    <UnplugIcon className="size-3.5" />
+                    Disconnect agent session
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
+            ) : null}
+          </>
         ) : null
       }
     >

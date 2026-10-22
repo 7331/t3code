@@ -27,6 +27,28 @@ import {
 import { useComposerMenuProps } from "./composerEventScope";
 import { shortcutLabelForCommand } from "../../keybindings";
 
+/**
+ * The model the picker shows as selected and the name on its trigger. Other surfaces that name the
+ * same selection call this so they never disagree with the picker.
+ */
+export function resolveProviderModelPickerTrigger(input: {
+  readonly driverKind: ProviderDriverKind | undefined;
+  readonly model: string;
+  readonly options: ReadonlyArray<ModelEsque>;
+}): { readonly selectedModel: ModelEsque | undefined; readonly title: string } {
+  const selectedModel =
+    resolveModelPickerSelectedModel(input) ??
+    (input.driverKind === "opencode" || input.driverKind === "antigravity"
+      ? undefined
+      : input.options[0]);
+  const title = selectedModel
+    ? getTriggerDisplayModelName(selectedModel)
+    : input.model === ANTIGRAVITY_DEFAULT_MODEL
+      ? "Choose model"
+      : input.model || "Choose model";
+  return { selectedModel, title };
+}
+
 export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   environmentId: EnvironmentId | null;
   activeInstanceId: ProviderInstanceId;
@@ -64,20 +86,11 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
 
   const activeInstanceId = props.activeInstanceId;
   const selectedInstanceOptions = props.modelOptionsByInstance.get(activeInstanceId) ?? [];
-  const selectedModel =
-    resolveModelPickerSelectedModel({
-      driverKind: activeEntry?.driverKind,
-      model: props.model,
-      options: selectedInstanceOptions,
-    }) ??
-    (activeEntry?.driverKind === "opencode" || activeEntry?.driverKind === "antigravity"
-      ? undefined
-      : selectedInstanceOptions[0]);
-  const triggerTitle = selectedModel
-    ? getTriggerDisplayModelName(selectedModel)
-    : props.model === ANTIGRAVITY_DEFAULT_MODEL
-      ? "Choose model"
-      : props.model || "Choose model";
+  const { selectedModel, title: triggerTitle } = resolveProviderModelPickerTrigger({
+    driverKind: activeEntry?.driverKind,
+    model: props.model,
+    options: selectedInstanceOptions,
+  });
   const triggerLabel = selectedModel
     ? `${getTriggerDisplayModelLabel(selectedModel)}${selectedModel.isUnavailable ? " (Unavailable)" : ""}`
     : triggerTitle;
