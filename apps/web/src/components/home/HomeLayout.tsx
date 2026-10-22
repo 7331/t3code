@@ -71,8 +71,7 @@ export function HomeSectionHeading({
 }
 
 /**
- * The first card spans the grid, the rest pair up on wide screens, and a card left alone in the
- * last row spans too.
+ * Cards pair up on wide screens; with an odd count the first takes a full row.
  */
 export function HomeCardGrid({
   cards,

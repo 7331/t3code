@@ -5,6 +5,10 @@ import {
 } from "@t3tools/client-runtime/state/thread-sort";
 import type { OrchestrationV2ProjectedTurnItem, SidebarThreadSortOrder } from "@t3tools/contracts";
 
+import { liveThoughtLine, summarizeToolGroup } from "@t3tools/client-runtime/work-log/presentation";
+
+import { deriveTimelineEntriesFromVisibleTurnItems, type WorkLogEntry } from "../../session-logic";
+import { liveWorkEntryLabel } from "../chat/MessagesTimeline.logic";
 import { filterSidebarV2VisibleThreads } from "../Sidebar.logic";
 
 /** Each card holds a live subscription to its thread's detail stream, so Home stays a handful. */
@@ -62,40 +66,105 @@ export function selectHomeThreads<T extends HomeThreadInput>(
   return { source: "recent", threads: recent };
 }
 
-export interface HomeCardMessage {
-  readonly id: string;
-  readonly role: "user" | "assistant";
-  readonly text: string;
-  readonly streaming: boolean;
-}
+/** A card's transcript line: a message, or one muted line for the agent work between messages. */
+export type HomeCardRow =
+  | {
+      readonly kind: "message";
+      readonly id: string;
+      readonly role: "user" | "assistant";
+      readonly text: string;
+      readonly streaming: boolean;
+    }
+  | {
+      readonly kind: "activity";
+      readonly id: string;
+      readonly entries: ReadonlyArray<WorkLogEntry>;
+    };
 
-/** The conversation's last few user and assistant messages, oldest first; tool work is left to the thread. */
-export function latestHomeCardMessages(
+/**
+ * The conversation's last few messages, oldest first, with each stretch of thinking and tool work
+ * between them folded into one activity row. Plans, errors and other cards stay in the thread.
+ */
+export function latestHomeCardRows(
   items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>,
   limit: number = HOME_CARD_MESSAGE_LIMIT,
-): ReadonlyArray<HomeCardMessage> {
-  const messages: HomeCardMessage[] = [];
-  for (let index = items.length - 1; index >= 0 && messages.length < limit; index -= 1) {
-    const { item } = items[index]!;
-    if (item.type === "user_message" && item.text.trim().length > 0) {
-      messages.push({ id: item.id, role: "user", text: item.text, streaming: false });
-    } else if (
-      item.type === "assistant_message" &&
-      (item.text.trim().length > 0 || item.streaming)
-    ) {
-      messages.push({ id: item.id, role: "assistant", text: item.text, streaming: item.streaming });
+): ReadonlyArray<HomeCardRow> {
+  const entries = deriveTimelineEntriesFromVisibleTurnItems({
+    visibleTurnItems: items,
+    optimisticMessages: [],
+  });
+  const rows: HomeCardRow[] = [];
+  let work: WorkLogEntry[] = [];
+  const flushWork = () => {
+    if (work.length === 0) return;
+    const ordered = work.toReversed();
+    rows.push({ kind: "activity", id: `activity:${ordered[0]!.id}`, entries: ordered });
+    work = [];
+  };
+  let messageCount = 0;
+  for (let index = entries.length - 1; index >= 0 && messageCount < limit; index -= 1) {
+    const entry = entries[index]!;
+    if (entry.kind === "work") {
+      work.push(entry.entry);
+      continue;
     }
+    if (entry.kind !== "message") continue;
+    const { message } = entry;
+    if (message.role !== "user" && message.role !== "assistant") continue;
+    // A reply that has not produced text yet would hide the live activity row under it.
+    if (message.text.trim().length === 0) continue;
+    flushWork();
+    rows.push({
+      kind: "message",
+      id: message.id,
+      role: message.role,
+      text: message.text,
+      streaming: message.streaming,
+    });
+    messageCount += 1;
   }
-  return messages.toReversed();
+  // Work left over is older than the oldest kept message, so it belongs to one the card drops.
+  return rows.toReversed();
 }
 
 /**
- * The first card spans the grid, the rest pair up in two columns, and a card left alone in the
- * last row spans too instead of leaving half the row empty.
+ * What an activity row says. While the agent is on it, the newest step: its thought's lead line,
+ * or the tool it is running. Once it has moved on, the same summary the thread's work log uses.
+ */
+export function homeCardActivityLabel(
+  entries: ReadonlyArray<WorkLogEntry>,
+  live: boolean,
+  workspaceRoot: string | undefined,
+): { readonly label: string; readonly thinking: boolean; readonly failed: boolean } {
+  const latest = entries.at(-1);
+  if (live && latest !== undefined) {
+    if (latest.itemType === "reasoning") {
+      return {
+        label: liveThoughtLine(latest.detail ?? "") || "Thinking",
+        thinking: true,
+        failed: false,
+      };
+    }
+    return {
+      label: liveWorkEntryLabel(latest, workspaceRoot, true),
+      thinking: false,
+      failed: false,
+    };
+  }
+  const { summary, hasFailure } = summarizeToolGroup(entries);
+  return {
+    label: summary,
+    thinking: entries.every((entry) => entry.itemType === "reasoning"),
+    failed: hasFailure,
+  };
+}
+
+/**
+ * Cards pair up in two columns. With an odd count the first card takes a full row, so the rest
+ * still pair up and no row is left half empty.
  */
 export function homeCardSpansFullWidth(index: number, count: number): boolean {
-  if (index === 0) return true;
-  return index === count - 1 && (count - 1) % 2 === 1;
+  return index === 0 && count % 2 === 1;
 }
 
 /**
