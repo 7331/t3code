@@ -79,3 +79,23 @@ export function codeLanguageEntry(language: string): CodeBlockLanguage | null {
 export function codeLanguageLabel(language: string): string {
   return codeLanguageEntry(language)?.label ?? language;
 }
+
+/**
+ * The languages a picker lists: the known ones, plus the block's current and original fence
+ * languages when they are not among them, so a retagged block can always go back.
+ */
+export function codeBlockLanguageItems(
+  current: string,
+  originalLanguage?: string,
+): ReadonlyArray<CodeBlockLanguage> {
+  const extras: CodeBlockLanguage[] = [];
+  for (const language of [originalLanguage, current]) {
+    if (language === undefined) continue;
+    const id = codeLanguageEntry(language)?.id ?? language;
+    const known =
+      CODE_BLOCK_LANGUAGES.some((entry) => entry.id === id) ||
+      extras.some((entry) => entry.id === id);
+    if (!known) extras.push({ id, label: id });
+  }
+  return [...extras, ...CODE_BLOCK_LANGUAGES];
+}

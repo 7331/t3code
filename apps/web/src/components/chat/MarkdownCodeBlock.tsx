@@ -16,12 +16,10 @@ import {
 import { MorphIcon } from "../MorphIcon";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { codeLanguageEntry } from "~/composer-code-languages";
+import { ComposerCodeBlockLanguagePicker } from "./ComposerCodeBlockLanguagePicker";
 import { HighlightedCodeLines } from "./HighlightedCodeLines";
-import {
-  createHighlightCacheKey,
-  estimateHighlightedSize,
-  extractFenceLanguage,
-} from "./MarkdownCodeBlock.logic";
+import { createHighlightCacheKey, estimateHighlightedSize } from "./MarkdownCodeBlock.logic";
 import { reportMarkdownActionFailure } from "./markdownActionFailure";
 import { PierreEntryIcon } from "./PierreEntryIcon";
 
@@ -60,7 +58,7 @@ export function MarkdownCodeBlockFrame({
 }) {
   return (
     <Wrapper
-      className="chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
+      className="chat-markdown-codeblock group/codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
       data-language={language}
       data-wrap={wrapped ? "true" : "false"}
     >
@@ -129,6 +127,7 @@ export function MarkdownCodeBlock({
   fenceTitle,
   theme,
   onRunShellCommand,
+  languagePicker,
   isStreaming,
   viewToggle,
   canWrap = true,
@@ -140,6 +139,8 @@ export function MarkdownCodeBlock({
   fenceTitle: string | null;
   theme: "light" | "dark";
   onRunShellCommand?: ((command: string) => void) | undefined;
+  /** Lets the reader retag the block; shown disabled until the fence closes. */
+  languagePicker?: MarkdownCodeBlockLanguagePicker | undefined;
   isStreaming: boolean;
   viewToggle?: ReactNode;
   canWrap?: boolean;
@@ -155,7 +156,10 @@ export function MarkdownCodeBlock({
   const canRun =
     onRunShellCommand !== undefined &&
     !isStreaming &&
-    /^(?:sh|bash|zsh|fish|shell|powershell|pwsh)$/.test(language) &&
+    // The picker resolves case and aliases ("Bash", "sh"), so Run must agree with what it shows.
+    /^(?:bash|zsh|fish|powershell|pwsh)$/.test(
+      codeLanguageEntry(language)?.id ?? language.toLowerCase(),
+    ) &&
     code.endsWith("\n") &&
     command.length > 0 &&
     !command.endsWith("\\") &&
@@ -239,6 +243,26 @@ export function MarkdownCodeBlock({
       theme={theme}
       wrapped={wrapped}
       headerProps={THREAD_FIND_IGNORE_PROPS}
+      title={
+        languagePicker ? (
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <ComposerCodeBlockLanguagePicker
+              language={language}
+              originalLanguage={languagePicker.originalLanguage}
+              theme={theme}
+              disabled={languagePicker.disabled}
+              quietChevron
+              lazy
+              onChange={(next) => languagePicker.onChange(next || "text")}
+            />
+            {fenceTitle ? (
+              <span className="truncate font-mono text-2xs text-muted-foreground">
+                {fenceTitle}
+              </span>
+            ) : null}
+          </span>
+        ) : undefined
+      }
       actions={
         <span className="flex items-center gap-0.5" role="toolbar" aria-label="Code block actions">
           {canWrap ? (
@@ -288,22 +312,28 @@ export function MarkdownCodeBlock({
   );
 }
 
+export interface MarkdownCodeBlockLanguagePicker {
+  /** The fence's own language, so the list can always go back to it. */
+  readonly originalLanguage: string;
+  readonly disabled: boolean;
+  readonly onChange: (language: string) => void;
+}
+
 interface SuspenseShikiCodeBlockProps {
-  className: string | undefined;
+  language: string;
   code: string;
   themeName: DiffThemeName;
   isStreaming: boolean;
 }
 
 export function SuspenseShikiCodeBlock({
-  className,
+  language,
   code,
   themeName,
   isStreaming,
 }: SuspenseShikiCodeBlockProps) {
   const [hasStreamed, setHasStreamed] = useState(isStreaming);
   if (isStreaming && !hasStreamed) setHasStreamed(true);
-  const language = extractFenceLanguage(className);
   const cacheKey = createHighlightCacheKey(code, language, themeName);
   // Once lines are mounted individually, keep that renderer when streaming
   // finishes so switching to cached HTML cannot clear an existing selection.

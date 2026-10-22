@@ -74,6 +74,7 @@ import React, {
   useLayoutEffect,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 import type {
@@ -947,6 +948,13 @@ function markdownHeadingRenderer(level: 1 | 2 | 3 | 4 | 5 | 6) {
 }
 
 // Keep component types stable when streaming changes the message state.
+/** A reader's language pick for one code block, tied to the code and fence it was made on. */
+interface CodeBlockLanguagePick {
+  readonly language: string;
+  readonly code: string;
+  readonly fenceLanguage: string;
+}
+
 const CHAT_MARKDOWN_COMPONENTS = {
   h1: markdownHeadingRenderer(1),
   h2: markdownHeadingRenderer(2),
@@ -1475,6 +1483,14 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <MarkdownDetails open={detailsOpen}>{children}</MarkdownDetails>;
   },
   pre: function MarkdownPre({ node, children, ...props }) {
+    // Lets the reader correct a mistagged fence, which also decides whether Run is offered. A pick
+    // belongs to the code and fence it was made on: renderers are reused when text changes, so a
+    // pick must not carry over to different code in the same slot. The label and Run follow the
+    // pick at once; highlighting follows in a transition that keeps the old colours on screen while
+    // the new grammar loads.
+    const [picked, setPicked] = useState<CodeBlockLanguagePick | null>(null);
+    const [highlighted, setHighlighted] = useState<CodeBlockLanguagePick | null>(null);
+    const [, startHighlightTransition] = useTransition();
     const {
       resolvedTheme,
       diffThemeName,
@@ -1501,9 +1517,30 @@ const CHAT_MARKDOWN_COMPONENTS = {
       return <MarkdownMath tex={codeBlock.code} display focusable={!inline} />;
     }
     const fenceTitle = extractFenceTitle(extractPreCodeMeta(node));
+    const pickFor = (pick: CodeBlockLanguagePick | null) =>
+      pick !== null && pick.code === codeBlock.code && pick.fenceLanguage === language
+        ? pick.language
+        : null;
+    const displayLanguage = pickFor(picked) ?? language;
+    const highlightLanguage = pickFor(highlighted) ?? language;
+    const fenceClosed = isClosedCodeFence(node, text, codeBlock.code);
+    const isComplete = !isStreaming && fenceClosed;
+    // Only replies that can run commands offer the picker: elsewhere (file previews, plans, pull
+    // requests) a retag changes nothing the reader can use and reads as editing the source.
+    const languagePicker = onRunShellCommand
+      ? {
+          originalLanguage: language,
+          disabled: !isComplete,
+          onChange: (next: string) => {
+            const pick = { language: next, code: codeBlock.code, fenceLanguage: language };
+            setPicked(pick);
+            startHighlightTransition(() => setHighlighted(pick));
+          },
+        }
+      : undefined;
     const highlightedCode = (
       <RenderErrorBoundary
-        resetKeys={[codeBlock.code, language, diffThemeName, isStreaming]}
+        resetKeys={[codeBlock.code, highlightLanguage, diffThemeName, isStreaming]}
         fallback={<pre {...props}>{children}</pre>}
       >
         <Suspense
@@ -1514,7 +1551,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
           }
         >
           <SuspenseShikiCodeBlock
-            className={codeBlock.className}
+            language={highlightLanguage}
             code={codeBlock.code}
             themeName={diffThemeName}
             isStreaming={isStreaming}
@@ -1522,13 +1559,14 @@ const CHAT_MARKDOWN_COMPONENTS = {
         </Suspense>
       </RenderErrorBoundary>
     );
-    if (language === "mermaid") {
+    if (displayLanguage === "mermaid") {
       return (
         <MarkdownMermaidCodeBlock
           code={codeBlock.code}
           fenceTitle={fenceTitle}
           theme={resolvedTheme}
-          isStreaming={isStreaming && !isClosedCodeFence(node, text, codeBlock.code)}
+          isStreaming={isStreaming && !fenceClosed}
+          languagePicker={languagePicker}
           onExpand={(src) => expandMedia({ images: [{ src, name: "Mermaid diagram" }], index: 0 })}
         >
           {highlightedCode}
@@ -1538,14 +1576,11 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return (
       <MarkdownCodeBlock
         code={codeBlock.code}
-        language={language}
+        language={displayLanguage}
         fenceTitle={fenceTitle}
         theme={resolvedTheme}
-        onRunShellCommand={
-          onRunShellCommand && !isStreaming && isClosedCodeFence(node, text, codeBlock.code)
-            ? onRunShellCommand
-            : undefined
-        }
+        onRunShellCommand={onRunShellCommand && isComplete ? onRunShellCommand : undefined}
+        languagePicker={languagePicker}
         isStreaming={isStreaming}
       >
         {highlightedCode}
