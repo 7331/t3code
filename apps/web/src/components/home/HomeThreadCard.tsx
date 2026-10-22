@@ -3,7 +3,10 @@ import {
   scopeThreadRef,
   scopedThreadKey,
 } from "@t3tools/client-runtime/environment";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import {
+  type EnvironmentThreadShell,
+  threadRuntimeIsActive,
+} from "@t3tools/client-runtime/state/models";
 import {
   deriveProviderSubagentStatus,
   formatProviderSubagentStatus,
@@ -11,12 +14,14 @@ import {
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  BrainIcon,
   ChevronDownIcon,
   CircleCheckIcon,
   CircleDotIcon,
   PinIcon,
   PinOffIcon,
   SquareArrowOutUpRightIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -40,7 +45,12 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HomeCardComposer } from "./HomeCardComposer";
 import { threadRelationshipStatusLabel } from "../chat/ThreadRelationshipIcon";
-import { homeCardSubtitle, latestHomeCardMessages } from "./homeThreads.logic";
+import {
+  type HomeCardRow,
+  homeCardActivityLabel,
+  homeCardSubtitle,
+  latestHomeCardRows,
+} from "./homeThreads.logic";
 import { type HomeCardModel, useHomeCardModel } from "./useHomeCardModel";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { subagentStatusTone } from "./subagentBoard.logic";
@@ -167,7 +177,11 @@ export function HomeThreadCard({
       <AnimatedHeight>
         {collapsed ? null : (
           <>
-            <HomeCardTranscript threadRef={threadRef} cwd={cwd ?? undefined} />
+            <HomeCardTranscript
+              threadRef={threadRef}
+              cwd={cwd ?? undefined}
+              running={threadRuntimeIsActive(thread.runtime)}
+            />
             {readOnly ? (
               <HomeCardProviderSubagentFooter threadRef={threadRef} model={model} />
             ) : (
@@ -262,36 +276,40 @@ function CardIconButton({
 }
 
 /**
- * The latest messages, newest against the reply field. The body never scrolls, so the wheel always
+ * The latest messages and the agent's work between them, newest against the reply field. The body never scrolls, so the wheel always
  * moves the page; older messages fade out at the top and the thread is one click away.
  */
 function HomeCardTranscript({
   threadRef,
   cwd,
+  running,
 }: {
   readonly threadRef: ScopedThreadRef;
   readonly cwd: string | undefined;
+  readonly running: boolean;
 }) {
   const projection = useThreadProjection(threadRef);
-  const messages = latestHomeCardMessages(useThreadVisibleTurnItems(threadRef));
-  if (messages.length === 0) {
+  const rows = latestHomeCardRows(useThreadVisibleTurnItems(threadRef));
+  if (rows.length === 0) {
     return (
       <p className="flex min-h-20 items-center justify-center px-4 py-3 text-sm text-muted-foreground">
         {projection === null ? "Loading…" : "No messages yet. Send the first one below."}
       </p>
     );
   }
-  return <HomeCardMessages threadRef={threadRef} cwd={cwd} messages={messages} />;
+  return <HomeCardMessages threadRef={threadRef} cwd={cwd} rows={rows} running={running} />;
 }
 
 function HomeCardMessages({
   threadRef,
   cwd,
-  messages,
+  rows,
+  running,
 }: {
   readonly threadRef: ScopedThreadRef;
   readonly cwd: string | undefined;
-  readonly messages: ReturnType<typeof latestHomeCardMessages>;
+  readonly rows: ReadonlyArray<HomeCardRow>;
+  readonly running: boolean;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -315,28 +333,55 @@ function HomeCardMessages({
       )}
     >
       <div ref={contentRef} className="flex shrink-0 flex-col gap-3">
-        {messages.map((message) =>
-          message.role === "user" ? (
+        {rows.map((row, index) =>
+          row.kind === "activity" ? (
+            <HomeCardActivity
+              key={row.id}
+              row={row}
+              live={running && index === rows.length - 1}
+              cwd={cwd}
+            />
+          ) : row.role === "user" ? (
             <div
-              key={message.id}
+              key={row.id}
               className="ms-auto max-w-[85%] rounded-2xl bg-message px-3 py-2 text-sm wrap-anywhere text-message-foreground"
             >
               {/* File links and mentions read as chips, as they do in the thread. */}
-              <ChatMarkdown text={message.text} cwd={cwd} threadRef={threadRef} lineBreaks />
+              <ChatMarkdown text={row.text} cwd={cwd} threadRef={threadRef} lineBreaks />
             </div>
           ) : (
-            <div key={message.id} className="min-w-0 text-sm">
+            <div key={row.id} className="min-w-0 text-sm">
               <ChatMarkdown
-                text={message.text}
+                text={row.text}
                 cwd={cwd}
                 threadRef={threadRef}
-                isStreaming={message.streaming}
+                isStreaming={row.streaming}
               />
             </div>
           ),
         )}
       </div>
     </div>
+  );
+}
+
+/** One muted line for a stretch of agent work; the thread's work log has the details. */
+function HomeCardActivity({
+  row,
+  live,
+  cwd,
+}: {
+  readonly row: Extract<HomeCardRow, { kind: "activity" }>;
+  readonly live: boolean;
+  readonly cwd: string | undefined;
+}) {
+  const { label, thinking, failed } = homeCardActivityLabel(row.entries, live, cwd);
+  const Icon = thinking ? BrainIcon : WrenchIcon;
+  return (
+    <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <Icon aria-hidden className={cn("size-3.5 shrink-0", failed && "text-error")} />
+      <span className="truncate">{label}</span>
+    </p>
   );
 }
 

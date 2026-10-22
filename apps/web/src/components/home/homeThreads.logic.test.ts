@@ -7,7 +7,8 @@ import {
   homeCardSpansFullWidth,
   homeCardSubtitle,
   homeCardThreadActions,
-  latestHomeCardMessages,
+  homeCardActivityLabel,
+  latestHomeCardRows,
   selectHomeThreads,
 } from "./homeThreads.logic";
 
@@ -130,25 +131,81 @@ describe("selectHomeThreads", () => {
   });
 });
 
-describe("latestHomeCardMessages", () => {
-  it("keeps the latest user and assistant messages in order and drops tool work", () => {
+describe("latestHomeCardRows", () => {
+  const summarize = (rows: ReturnType<typeof latestHomeCardRows>) =>
+    rows.map((row) =>
+      row.kind === "message"
+        ? `${row.role}:${row.text}`
+        : `activity:${row.entries.map((entry) => entry.itemType).join(",")}`,
+    );
+
+  it("keeps messages in order and folds the work between them into one row each", () => {
     const { visibleTurnItems } = makeStreamingTimelineFixture("Working on it");
 
-    expect(latestHomeCardMessages(visibleTurnItems, 4)).toEqual([
-      { id: "history-user-item", role: "user", text: "Inspect", streaming: false },
-      { id: "history-assistant-item", role: "assistant", text: "Done", streaming: false },
-      { id: "live-user-item", role: "user", text: "Continue", streaming: false },
-      { id: "live-assistant-item", role: "assistant", text: "Working on it", streaming: true },
+    expect(summarize(latestHomeCardRows(visibleTurnItems, 4))).toEqual([
+      "user:Inspect",
+      "activity:command_execution",
+      "assistant:Done",
+      "user:Continue",
+      "activity:dynamic_tool",
+      "assistant:Working on it",
     ]);
   });
 
-  it("returns only the newest messages when over the limit", () => {
+  it("previews the last three messages and drops work that came before them", () => {
     const { visibleTurnItems } = makeStreamingTimelineFixture("Working on it");
 
-    expect(latestHomeCardMessages(visibleTurnItems, 2).map((message) => message.id)).toEqual([
-      "live-user-item",
-      "live-assistant-item",
+    expect(summarize(latestHomeCardRows(visibleTurnItems))).toEqual([
+      "assistant:Done",
+      "user:Continue",
+      "activity:dynamic_tool",
+      "assistant:Working on it",
     ]);
+  });
+
+  it("shows work the agent is doing before it has written any reply", () => {
+    const { visibleTurnItems } = makeStreamingTimelineFixture("");
+
+    expect(summarize(latestHomeCardRows(visibleTurnItems)).slice(-2)).toEqual([
+      "user:Continue",
+      "activity:dynamic_tool",
+    ]);
+  });
+});
+
+describe("homeCardActivityLabel", () => {
+  const activity = (text: string) => {
+    const row = latestHomeCardRows(makeStreamingTimelineFixture(text).visibleTurnItems, 4).find(
+      (candidate) => candidate.kind === "activity",
+    );
+    if (row?.kind !== "activity") throw new Error("fixture has no activity row");
+    return row.entries;
+  };
+
+  it("summarizes finished work the way the thread's work log does, flagging failures", () => {
+    expect(homeCardActivityLabel(activity("Working on it"), false, "/repo")).toEqual({
+      label: "Ran 1 command",
+      thinking: false,
+      failed: true,
+    });
+  });
+
+  it("leads with the thought's heading while the agent is thinking", () => {
+    const thought = {
+      id: "thought",
+      createdAt: at(1),
+      label: "Reasoning",
+      tone: "thinking" as const,
+      itemType: "reasoning" as const,
+      detail: "**Checking the cart totals**\n\nThe discount runs before shipping.",
+    };
+
+    expect(homeCardActivityLabel([thought], true, "/repo")).toEqual({
+      label: "Checking the cart totals",
+      thinking: true,
+      failed: false,
+    });
+    expect(homeCardActivityLabel([thought], false, "/repo").label).toBe("Thought");
   });
 });
 
@@ -156,11 +213,11 @@ describe("homeCardSpansFullWidth", () => {
   const spans = (count: number) =>
     Array.from({ length: count }, (_, index) => homeCardSpansFullWidth(index, count));
 
-  it("spans the first card and a card left alone in the last row", () => {
+  it("pairs cards side by side and gives the first a full row only when the count is odd", () => {
     expect(spans(1)).toEqual([true]);
-    expect(spans(2)).toEqual([true, true]);
+    expect(spans(2)).toEqual([false, false]);
     expect(spans(3)).toEqual([true, false, false]);
-    expect(spans(4)).toEqual([true, false, false, true]);
+    expect(spans(4)).toEqual([false, false, false, false]);
     expect(spans(5)).toEqual([true, false, false, false, false]);
   });
 });
@@ -211,18 +268,6 @@ describe("homeCardThreadActions", () => {
         supportsSettlement: true,
       }),
     ).toEqual({ pin: false, settle: true });
-  });
-});
-
-describe("latestHomeCardMessages default", () => {
-  it("previews only the last three messages", () => {
-    const { visibleTurnItems } = makeStreamingTimelineFixture("Working on it");
-
-    expect(latestHomeCardMessages(visibleTurnItems).map((message) => message.id)).toEqual([
-      "history-assistant-item",
-      "live-user-item",
-      "live-assistant-item",
-    ]);
   });
 });
 
