@@ -4,7 +4,7 @@ import { Suspense, use, useState, type ReactNode } from "react";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { MarkdownCodeBlock, type MarkdownCodeBlockLanguagePicker } from "./MarkdownCodeBlock";
+import { MarkdownCodeBlock } from "./MarkdownCodeBlock";
 import { findRevealRef, MarkdownFindContext } from "./markdownFindContext";
 import { MermaidDiagram } from "./MermaidDiagram";
 
@@ -13,7 +13,6 @@ export function MarkdownMermaidCodeBlock({
   fenceTitle,
   theme,
   isStreaming,
-  languagePicker,
   onExpand,
   children,
 }: {
@@ -21,8 +20,6 @@ export function MarkdownMermaidCodeBlock({
   fenceTitle: string | null;
   theme: "light" | "dark";
   isStreaming: boolean;
-  /** Lets the reader retag a fence that was wrongly marked as a diagram. */
-  languagePicker?: MarkdownCodeBlockLanguagePicker | undefined;
   onExpand: (imageUrl: string) => void;
   children: ReactNode;
 }) {
@@ -39,7 +36,6 @@ export function MarkdownMermaidCodeBlock({
       fenceTitle={fenceTitle}
       theme={theme}
       isStreaming={isStreaming}
-      languagePicker={languagePicker}
       canWrap={!showDiagram}
       diagram={showDiagram}
       viewToggle={

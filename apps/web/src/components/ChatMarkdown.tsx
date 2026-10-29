@@ -77,10 +77,10 @@ import React, {
   type MouseEvent as ReactMouseEvent,
   use,
   memo,
+  useDeferredValue,
   useLayoutEffect,
   useRef,
   useState,
-  useTransition,
   type ReactNode,
 } from "react";
 import type {
@@ -944,13 +944,6 @@ function markdownHeadingRenderer(level: 1 | 2 | 3 | 4 | 5 | 6) {
   };
 }
 
-/** A reader's language pick for one code block, tied to the code and fence it was made on. */
-interface CodeBlockLanguagePick {
-  readonly language: string;
-  readonly code: string;
-  readonly fenceLanguage: string;
-}
-
 // Native word selection stops at hyphens and dots, so a double-click takes the whole span.
 function selectInlineCode(event: ReactMouseEvent<HTMLElement>) {
   window.getSelection()?.selectAllChildren(event.currentTarget);
@@ -1551,11 +1544,9 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <MarkdownDetails open={detailsOpen}>{children}</MarkdownDetails>;
   },
   pre: function MarkdownPre({ node, children, ...props }) {
-    // A reader can correct a mistagged fence; a pick belongs to its exact code and fence
-    // because renderers are reused when text changes. Highlighting trails in a transition.
-    const [picked, setPicked] = useState<CodeBlockLanguagePick | null>(null);
-    const [highlighted, setHighlighted] = useState<CodeBlockLanguagePick | null>(null);
-    const [, startHighlightTransition] = useTransition();
+    // Renderers are reused when text changes, so a pick only holds for the code it was made on.
+    const [picked, setPicked] = useState<{ language: string; code: string } | null>(null);
+    const deferredPicked = useDeferredValue(picked);
     const {
       resolvedTheme,
       diffThemeName,
@@ -1582,27 +1573,9 @@ const CHAT_MARKDOWN_COMPONENTS = {
       return <MarkdownMath tex={codeBlock.code} display focusable={!inline} />;
     }
     const fenceTitle = extractFenceTitle(extractPreCodeMeta(node));
-    const pickFor = (pick: CodeBlockLanguagePick | null) =>
-      pick !== null && pick.code === codeBlock.code && pick.fenceLanguage === language
-        ? pick.language
-        : null;
-    const displayLanguage = pickFor(picked) ?? language;
-    const highlightLanguage = pickFor(highlighted) ?? language;
-    const fenceClosed = isClosedCodeFence(node, text, codeBlock.code);
-    const isComplete = !isStreaming && fenceClosed;
-    // Only replies that can run commands offer the picker: elsewhere (file previews, plans, pull
-    // requests) a retag changes nothing the reader can use and reads as editing the source.
-    const languagePicker = onRunShellCommand
-      ? {
-          originalLanguage: language,
-          disabled: !isComplete,
-          onChange: (next: string) => {
-            const pick = { language: next, code: codeBlock.code, fenceLanguage: language };
-            setPicked(pick);
-            startHighlightTransition(() => setHighlighted(pick));
-          },
-        }
-      : undefined;
+    const displayLanguage = picked?.code === codeBlock.code ? picked.language : language;
+    const highlightLanguage =
+      deferredPicked?.code === codeBlock.code ? deferredPicked.language : language;
     const highlightedCode = (
       <RenderErrorBoundary
         resetKeys={[codeBlock.code, highlightLanguage, diffThemeName, isStreaming]}
@@ -1624,14 +1597,13 @@ const CHAT_MARKDOWN_COMPONENTS = {
         </Suspense>
       </RenderErrorBoundary>
     );
-    if (displayLanguage === "mermaid") {
+    if (language === "mermaid") {
       return (
         <MarkdownMermaidCodeBlock
           code={codeBlock.code}
           fenceTitle={fenceTitle}
           theme={resolvedTheme}
-          isStreaming={isStreaming && !fenceClosed}
-          languagePicker={languagePicker}
+          isStreaming={isStreaming && !isClosedCodeFence(node, text, codeBlock.code)}
           onExpand={(src) => expandMedia({ images: [{ src, name: "Mermaid diagram" }], index: 0 })}
         >
           {highlightedCode}
@@ -1644,8 +1616,17 @@ const CHAT_MARKDOWN_COMPONENTS = {
         language={displayLanguage}
         fenceTitle={fenceTitle}
         theme={resolvedTheme}
-        onRunShellCommand={onRunShellCommand && isComplete ? onRunShellCommand : undefined}
-        languagePicker={languagePicker}
+        onRunShellCommand={
+          onRunShellCommand && !isStreaming && isClosedCodeFence(node, text, codeBlock.code)
+            ? onRunShellCommand
+            : undefined
+        }
+        // Only replies that can run commands offer the picker; elsewhere a retag gains nothing.
+        onLanguageChange={
+          onRunShellCommand
+            ? (next) => setPicked({ language: next, code: codeBlock.code })
+            : undefined
+        }
         isStreaming={isStreaming}
       >
         {highlightedCode}
