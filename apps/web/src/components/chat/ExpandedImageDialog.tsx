@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, XIcon, Pencil } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import { Image as ImageGlyph, Text as TextGlyph } from "lucide";
 import { Button } from "../ui/button";
 import { MorphIcon } from "~/components/MorphIcon";
@@ -76,7 +76,13 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   const [imageOffset, setImageOffset] = useState(0);
   const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [accessibilityDetailsSrc, setAccessibilityDetailsSrc] = useState<string | null>(null);
-  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
+  // Opening an image lands directly in the editor; only non-editable media
+  // (videos, failed loads) shows the plain viewer instead.
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(() =>
+    preview.images[preview.index]?.type === "video" || preview.images[preview.index]?.src === null
+      ? null
+      : preview.index,
+  );
   const zoomableImageRef = useRef<ZoomableImageHandle>(null);
   const [returnFocusTarget] = useState(() =>
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
@@ -155,17 +161,11 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
       if (event.key !== "Escape" || isContextMenuOpen()) return;
       event.preventDefault();
       event.stopPropagation();
-      // The first Escape leaves edit mode so a stray keypress cannot drop the
-      // whole viewer, and uncommitted strokes are still lost visibly.
-      if (editing) {
-        setEditing(false);
-        return;
-      }
       onClose();
     };
     window.addEventListener("keydown", onEscape, { capture: true });
     return () => window.removeEventListener("keydown", onEscape, { capture: true });
-  }, [onClose, editing, setEditing]);
+  }, [onClose]);
 
   if (!item) return null;
   const mediaLabel = item.type === "video" ? "video" : "image";
@@ -227,7 +227,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             variant="media-navigation"
             className="left-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
             aria-label="Previous media"
-            disabled={editing}
             onClick={() => navigateImage(-1)}
           >
             <ChevronLeftIcon className="size-5" />
@@ -279,24 +278,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                 {item.name}
                 {preview.images.length > 1 ? ` (${index + 1}/${preview.images.length})` : ""}
               </span>
-              {canEditImage ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        aria-label={editing ? "Stop editing image" : "Edit image"}
-                        aria-pressed={editing}
-                        onClick={() => setEditing(!editing)}
-                        size="icon-micro"
-                        variant="overlay"
-                      />
-                    }
-                  >
-                    <Pencil className="size-3" aria-hidden="true" />
-                  </TooltipTrigger>
-                  <TooltipPopup side="top">{editing ? "Stop editing" : "Edit image"}</TooltipPopup>
-                </Tooltip>
-              ) : null}
               {accessibilityDetails && item.source ? (
                 <Tooltip>
                   <TooltipTrigger
@@ -333,7 +314,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             variant="media-navigation"
             className="right-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
             aria-label="Next media"
-            disabled={editing}
             onClick={() => navigateImage(1)}
           >
             <ChevronRightIcon className="size-5" />
