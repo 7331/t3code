@@ -188,7 +188,6 @@ import { toastManager } from "./ui/toast";
 import { projectScriptIdFromCommand } from "~/projectScripts";
 import { newMessageId } from "~/lib/utils";
 import { releaseAttachmentUpload } from "~/lib/attachmentUploadQueue";
-import { registerFaviconProjectForThread } from "~/browserFaviconStore";
 import {
   NO_PROVIDER_MODEL_SELECTION,
   providerInstanceEntriesFor,

@@ -5,6 +5,7 @@ import {
   CircleDashedIcon,
   CircleDotDashedIcon,
   MessageCircleQuestionIcon,
+  UserRoundIcon,
   ShieldQuestionIcon,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ const ICONS = {
   waiting: CircleDotDashedIcon,
   approval: ShieldQuestionIcon,
   input: MessageCircleQuestionIcon,
+  request: UserRoundIcon,
   failed: CircleAlertIcon,
   woke: AlarmClockIcon,
   done: CircleCheckIcon,

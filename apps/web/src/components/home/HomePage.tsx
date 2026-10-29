@@ -3,6 +3,7 @@ import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environ
 import { useClientSettings } from "../../hooks/useSettings";
 import {
   useAllEnvironmentShellsBootstrapped,
+  useDelegatedUnderParent,
   useProjects,
   useQuietThreadShells,
 } from "../../state/entities";
@@ -27,12 +28,13 @@ export function HomePage() {
   const projects = useProjects();
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
   const sortOrder = useClientSettings((settings) => settings.sidebarThreadSortOrder);
+  const delegatedUnderParent = useDelegatedUnderParent();
   const cardActions = useHomeCardActions();
   const collapsed = useCollapsedHomeCards();
 
   if (bootstrapped && projects.length === 0) return <NoProjectsHero />;
 
-  const selection = selectHomeThreads(threads, sortOrder);
+  const selection = selectHomeThreads(threads, sortOrder, delegatedUnderParent);
 
   return (
     <HomePageShell
@@ -44,7 +46,12 @@ export function HomePage() {
       }
     >
       <div className="flex min-h-0 items-start gap-6">
-        <HomeRail threads={threads} sortOrder={sortOrder} className="sticky top-0" />
+        <HomeRail
+          threads={threads}
+          sortOrder={sortOrder}
+          delegatedUnderParent={delegatedUnderParent}
+          className="sticky top-0"
+        />
         <div className="min-w-0 flex-1">
           {selection.threads.length === 0 ? (
             bootstrapped ? (

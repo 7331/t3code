@@ -85,7 +85,6 @@ function lockBackgroundScroll(popup: HTMLElement | null) {
     body.style.overflow = previousBodyOverflow;
     body.style.paddingRight = previousBodyPaddingRight;
   };
->>>>>>> main
 }
 
 export const ProviderModelPicker = memo(function ProviderModelPicker(props: {

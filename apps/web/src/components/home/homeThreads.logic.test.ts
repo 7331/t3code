@@ -44,6 +44,7 @@ describe("selectHomeThreads", () => {
     const selection = selectHomeThreads(
       [unpinned, second, archived, subagent, first],
       "updated_at",
+      new Set(),
     );
 
     expect(selection.source).toBe("pinned");
@@ -74,7 +75,7 @@ describe("selectHomeThreads", () => {
       }),
     ];
 
-    const selection = selectHomeThreads(threads, "updated_at");
+    const selection = selectHomeThreads(threads, "updated_at", new Set());
 
     expect(selection.source).toBe("recent");
     expect(selection.threads.map((thread) => thread.id)).toEqual(["a-new", "b-only"]);
@@ -104,9 +105,9 @@ describe("selectHomeThreads", () => {
       }),
     ];
 
-    expect(selectHomeThreads(threads, "updated_at").threads.map((thread) => thread.id)).toEqual([
-      "a-talked",
-    ]);
+    expect(
+      selectHomeThreads(threads, "updated_at", new Set()).threads.map((thread) => thread.id),
+    ).toEqual(["a-talked"]);
   });
 
   it("still shows an empty thread the user pinned", () => {
@@ -116,7 +117,9 @@ describe("selectHomeThreads", () => {
       visibleItemCount: 0,
     });
 
-    expect(selectHomeThreads([pinnedEmpty], "updated_at").threads).toEqual([pinnedEmpty]);
+    expect(selectHomeThreads([pinnedEmpty], "updated_at", new Set()).threads).toEqual([
+      pinnedEmpty,
+    ]);
   });
 
   it("caps the number of cards", () => {
@@ -128,7 +131,9 @@ describe("selectHomeThreads", () => {
       }),
     );
 
-    expect(selectHomeThreads(threads, "updated_at").threads).toHaveLength(HOME_MAX_CARDS);
+    expect(selectHomeThreads(threads, "updated_at", new Set()).threads).toHaveLength(
+      HOME_MAX_CARDS,
+    );
   });
 });
 
@@ -146,7 +151,7 @@ describe("selectHomeRailThreads", () => {
       updatedAt: at(9),
       visibleItemCount: 3,
     });
-    const selection = selectHomeRailThreads([pinned, otherProjectRecent], "updated_at");
+    const selection = selectHomeRailThreads([pinned, otherProjectRecent], "updated_at", new Set());
     expect(selection.pinned.map((thread) => thread.id)).toEqual([pinned.id]);
     expect(selection.recent.map((thread) => thread.id)).toEqual([otherProjectRecent.id]);
   });
@@ -172,6 +177,7 @@ describe("selectHomeRailThreads", () => {
     const selection = selectHomeRailThreads(
       [pinnedFresh, olderSameProject, emptyThread],
       "updated_at",
+      new Set(),
     );
     expect(selection.pinned.map((thread) => thread.id)).toEqual([pinnedFresh.id]);
     expect(selection.recent).toEqual([]);

@@ -5,7 +5,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HomePage } from "../components/home/HomePage";
 import { SubagentBoardPage } from "../components/home/SubagentBoardPage";
 
-interface HomeSearch {
+export interface HomeSearch {
   /** Both set: show that thread's subagents board instead of Home's pinned threads. */
   readonly parentEnvironmentId?: EnvironmentId;
   readonly parentThreadId?: ThreadId;

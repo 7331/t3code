@@ -39,7 +39,10 @@ import { ComposerSendButton } from "../chat/ComposerSendButton";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { useComposerMenuItems } from "../chat/useComposerMenuItems";
 import { useComposerTriggerState } from "../chat/useComposerTriggerState";
-import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
+import {
+  ComposerPromptEditorTiptap as ComposerPromptEditor,
+  type ComposerPromptEditorHandle,
+} from "../ComposerPromptEditorTiptap";
 import { toastManager } from "../ui/toast";
 import {
   applyHomeCardMenuItem,
@@ -50,6 +53,7 @@ import {
 } from "./homeCardComposer.logic";
 import type { HomeCardModel } from "./useHomeCardModel";
 
+const NO_LINKED_ENVIRONMENTS = new Map<never, never>();
 const NO_SKILLS: ReadonlyArray<never> = [];
 /** Only feeds the menu hook while the thread's provider is unknown; it then has no skills to list. */
 const FALLBACK_DRIVER_KIND = ProviderDriverKind.make("codex");
@@ -107,6 +111,9 @@ export function HomeCardComposer({
   const menu = useComposerMenuItems({
     composerTrigger: trigger,
     environmentId: thread.environmentId,
+    // A card is not the full composer: no linked environments, no question attachments.
+    linkedEnvironments: NO_LINKED_ENVIRONMENTS,
+    questionAttachmentTarget: null,
     gitCwd: cwd,
     activeThreadId: thread.id,
     pullRequestProjectId: null,
@@ -251,7 +258,13 @@ export function HomeCardComposer({
             }
             placeholderClassName="truncate"
             className={HOME_CARD_EDITOR_CLASS}
-            onChange={(nextValue, nextCursor, expandedCursor, cursorAdjacentToMention) => {
+            onChange={(
+              nextValue,
+              nextCursor,
+              expandedCursor,
+              cursorAdjacentToMention,
+              _contextIds,
+            ) => {
               setPrompt(threadRef, nextValue);
               setCursor(nextCursor);
               setTrigger(

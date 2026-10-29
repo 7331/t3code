@@ -1287,6 +1287,8 @@ describe("resolveSidebarRowStatus", () => {
     expect(resolveSidebarRowStatus({ ...base, status: "approval" })?.label).toBe("Approval");
     expect(resolveSidebarRowStatus({ ...base, status: "limited" })?.icon).toBe("failed");
     expect(resolveSidebarRowStatus({ ...base, status: "ready", isWoke: true })?.label).toBe("Woke");
+  });
+});
 
 describe("pendingSidebarRouteReveal", () => {
   it("keeps a revealed thread settled across a mount that reads no route params", () => {

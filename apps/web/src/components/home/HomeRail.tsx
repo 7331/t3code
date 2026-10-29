@@ -85,15 +85,17 @@ function HomeRailSection({
 export function HomeRail({
   threads,
   sortOrder,
+  delegatedUnderParent,
   className,
 }: {
   readonly threads: ReadonlyArray<EnvironmentThreadShell>;
   readonly sortOrder: SidebarThreadSortOrder;
+  readonly delegatedUnderParent: ReadonlySet<string>;
   readonly className?: string | undefined;
 }) {
   const { handleNewThread } = useHandleNewThread();
   const navigate = useNavigate();
-  const selection = selectHomeRailThreads(threads, sortOrder);
+  const selection = selectHomeRailThreads(threads, sortOrder, delegatedUnderParent);
   // Home has no active thread, so a new thread lands in the project the rail
   // is already pointing at: the freshest one with messages, else the newest pin.
   const newThreadProjectThread = selection.recent[0] ?? selection.pinned[0] ?? null;

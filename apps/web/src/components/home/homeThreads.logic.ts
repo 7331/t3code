@@ -46,8 +46,9 @@ export interface HomeThreadSelection<T> {
 export function selectHomeThreads<T extends HomeThreadInput>(
   threads: ReadonlyArray<T>,
   sortOrder: SidebarThreadSortOrder,
+  delegatedUnderParent: ReadonlySet<string>,
 ): HomeThreadSelection<T> {
-  const visible = filterSidebarV2VisibleThreads(threads, null);
+  const visible = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent);
   const pinned = visible.filter((thread) => thread.pinnedAt !== null);
   if (pinned.length > 0) {
     return {
@@ -80,8 +81,9 @@ export interface HomeRailSelection<T> {
 export function selectHomeRailThreads<T extends HomeThreadInput>(
   threads: ReadonlyArray<T>,
   sortOrder: SidebarThreadSortOrder,
+  delegatedUnderParent: ReadonlySet<string>,
 ): HomeRailSelection<T> {
-  const visible = filterSidebarV2VisibleThreads(threads, null);
+  const visible = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent);
   const pinned = sortPinnedThreadsByOrderKey(
     visible.filter((thread) => thread.pinnedAt !== null),
   ).slice(0, HOME_RAIL_MAX_PER_SECTION);

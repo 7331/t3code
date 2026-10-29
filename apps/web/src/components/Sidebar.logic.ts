@@ -816,6 +816,7 @@ export type SidebarRowStatusIcon =
   | "waiting"
   | "approval"
   | "input"
+  | "request"
   | "failed"
   | "woke"
   | "done";
@@ -831,7 +832,8 @@ const SIDEBAR_ROW_STATUS_PRESENTATION = {
   waiting: { label: "Waiting", icon: "waiting", className: "text-muted-foreground" },
   approval: { label: "Approval", icon: "approval", className: "text-warning-foreground" },
   input: { label: "Input", icon: "input", className: "text-indigo-600 dark:text-indigo-300" },
-  limited: { label: "Limited", icon: "failed", className: "text-warning" },
+  limited: { label: "Limited", icon: "failed", className: "text-warning-foreground" },
+  request: { label: "Request", icon: "request", className: "text-guest-foreground" },
   failed: { label: "Failed", icon: "failed", className: "text-error" },
   woke: { label: "Woke", icon: "woke", className: "text-warning" },
   done: { label: "Done", icon: "done", className: "text-success" },
@@ -1000,6 +1002,35 @@ export type SidebarV2TopStatusKind =
   | "waiting"
   | "woke"
   | "working";
+
+function resolveSidebarV2TopStatus(input: {
+  readonly status: SidebarThreadStatus;
+  readonly isUnread: boolean;
+  readonly isWoke: boolean;
+}): SidebarV2TopStatusKind | null {
+  if (input.status === "working") {
+    return "working";
+  }
+  if (input.status === "waiting") {
+    return "waiting";
+  }
+  if (input.status === "approval") {
+    return "approval";
+  }
+  if (input.status === "input") {
+    return "input";
+  }
+  if (input.status === "request") {
+    return "request";
+  }
+  if (input.status === "failed" || input.status === "limited") {
+    return input.status;
+  }
+  if (input.isWoke) {
+    return "woke";
+  }
+  return input.isUnread ? "done" : null;
+}
 
 export function firstValidTimestampMs(
   ...candidates: ReadonlyArray<string | null | undefined>
