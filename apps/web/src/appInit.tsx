@@ -35,7 +35,7 @@ import {
   startModelPreferencesMigration,
   subscribeClientSettings,
 } from "./hooks/useSettings";
-import { syncBrowserChromeTheme } from "./hooks/useTheme";
+import { syncBrowserChromeTheme } from "./themePalette";
 import { startThreadVisitedMigration } from "./hooks/useThreadVisitedMigration";
 import { installDesktopPasteAsText } from "./lib/desktopPasteAsText";
 import {
