@@ -171,11 +171,12 @@ import { makeWorkspaceFileDropHandlers } from "./chat/workspaceFileDrop";
 import { isEditableFocused } from "../lib/editableFocus";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { shortcutLabelForCommand } from "../keybindings";
-import { cn } from "~/lib/utils";
+import { cn, randomUUID } from "~/lib/utils";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { projectScriptIdFromCommand } from "~/projectScripts";
 import { newMessageId } from "~/lib/utils";
+import { releaseAttachmentUpload } from "~/lib/attachmentUploadQueue";
 import { registerFaviconProjectForThread } from "~/browserFaviconStore";
 import {
   applyProviderInstanceSettings,
@@ -246,6 +247,8 @@ import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
+import type { ExpandedImageItem } from "./chat/ExpandedImagePreview";
+import { annotatedImageFileName } from "./chat/ImageAnnotationEditor";
 import {
   BranchRestoreConfirmHost,
   DeviceSetupDialogHost,
@@ -3094,6 +3097,48 @@ export default function ChatView(props: ChatViewProps) {
   };
   const onExpandTimelineImageStable = useStableCallback(onExpandTimelineImage);
 
+  const applyExpandedImageEdit = (item: ExpandedImageItem, file: File) => {
+    const { addImages, replaceImage } = useComposerDraftStore.getState();
+    const name = annotatedImageFileName(item.name);
+    if (item.composerImage) {
+      // The uploaded bytes (if any) belong to the pre-edit image, so the
+      // replacement uploads again instead of reusing them.
+      releaseAttachmentUpload(item.composerImage.id);
+      replaceImage(composerDraftTarget, {
+        ...item.composerImage,
+        name,
+        mimeType: "image/png",
+        sizeBytes: file.size,
+        previewUrl: URL.createObjectURL(file),
+        file,
+      });
+      toastManager.add({ type: "success", title: `Replaced ${item.name} with the edited image.` });
+      return;
+    }
+    const imageId = randomUUID();
+    const accepted = addImages(composerDraftTarget, [
+      {
+        type: "image",
+        id: imageId,
+        name,
+        mimeType: "image/png",
+        sizeBytes: file.size,
+        previewUrl: URL.createObjectURL(file),
+        file,
+      },
+    ]);
+    if (!accepted.includes(imageId)) {
+      toastManager.add({
+        type: "error",
+        title: "The draft rejected the edited image",
+        description: "It may be a duplicate, or the attachment limit was reached.",
+      });
+      return;
+    }
+    toastManager.add({ type: "success", title: `Added ${name} to the composer.` });
+  };
+  const applyExpandedImageEditStable = useStableCallback(applyExpandedImageEdit);
+
   const pendingSidebarFileDrops = useSidebarPendingFileDropStore((state) => state.pending);
   const consumePendingFileDrop = useSidebarPendingFileDropStore(
     (state) => state.consumePendingFileDrop,
@@ -3961,7 +4006,10 @@ export default function ChatView(props: ChatViewProps) {
       <RevertConfirmHost threadKey={routeThreadKey} onConfirm={onConfirmRevertStable} />
       <LinkPullRequestDialogHost />
       <ThreadVisitWatermark threadRef={routeThreadRef} />
-      <ExpandedImageDialogHost threadKey={routeThreadKey} />
+      <ExpandedImageDialogHost
+        threadKey={routeThreadKey}
+        onApplyImageEdit={applyExpandedImageEditStable}
+      />
     </div>
   );
   return (
