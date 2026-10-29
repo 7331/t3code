@@ -1551,11 +1551,8 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <MarkdownDetails open={detailsOpen}>{children}</MarkdownDetails>;
   },
   pre: function MarkdownPre({ node, children, ...props }) {
-    // Lets the reader correct a mistagged fence, which also decides whether Run is offered. A pick
-    // belongs to the code and fence it was made on: renderers are reused when text changes, so a
-    // pick must not carry over to different code in the same slot. The label and Run follow the
-    // pick at once; highlighting follows in a transition that keeps the old colours on screen while
-    // the new grammar loads.
+    // A reader can correct a mistagged fence; a pick belongs to its exact code and fence
+    // because renderers are reused when text changes. Highlighting trails in a transition.
     const [picked, setPicked] = useState<CodeBlockLanguagePick | null>(null);
     const [highlighted, setHighlighted] = useState<CodeBlockLanguagePick | null>(null);
     const [, startHighlightTransition] = useTransition();

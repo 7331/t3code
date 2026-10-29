@@ -315,6 +315,8 @@ function HomeCardMessages({
   const contentRef = useRef<HTMLDivElement>(null);
   const [clipped, setClipped] = useState(false);
 
+  // Keeps the clipped flag in step with the card's own scroll body while mounted.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a ResizeObserver on the card body and content is the measurement's only source
   useLayoutEffect(() => {
     const body = bodyRef.current;
     const content = contentRef.current;

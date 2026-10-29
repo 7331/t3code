@@ -11,7 +11,7 @@ const ONE_PIXEL_PNG_DATA_URL =
 describe("ImageAnnotationEditor", () => {
   it("mounts Painterro over the image and reports a saved PNG edit", async () => {
     const onApply = vi.fn();
-    await using screen = await render(
+    await using _screen = await render(
       <ImageAnnotationEditor
         src={ONE_PIXEL_PNG_DATA_URL}
         name="screenshot.png"

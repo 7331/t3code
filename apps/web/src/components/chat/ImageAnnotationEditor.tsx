@@ -30,6 +30,7 @@ export function ImageAnnotationEditor({
 
   // Fetch the bytes into a data URL: Painterro needs an embeddable source, and
   // a fetched copy keeps cross-origin asset URLs out of its loader.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps an external Painterro instance mounted in the holder for exactly this component's lifetime
   useEffect(() => {
     let cancelled = false;
     void (async () => {
