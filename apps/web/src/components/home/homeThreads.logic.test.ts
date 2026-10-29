@@ -9,6 +9,7 @@ import {
   homeCardThreadActions,
   homeCardActivityLabel,
   latestHomeCardRows,
+  selectHomeRailThreads,
   selectHomeThreads,
 } from "./homeThreads.logic";
 
@@ -128,6 +129,52 @@ describe("selectHomeThreads", () => {
     );
 
     expect(selectHomeThreads(threads, "updated_at").threads).toHaveLength(HOME_MAX_CARDS);
+  });
+});
+
+describe("selectHomeRailThreads", () => {
+  it("lists pinned and recent side by side without repeating a thread", () => {
+    const pinned = makeThreadFixture({
+      id: ThreadId.make("pin"),
+      pinnedAt: at(1),
+      pinOrderKey: "a0",
+      updatedAt: at(2),
+    });
+    const otherProjectRecent = makeThreadFixture({
+      id: ThreadId.make("fresh"),
+      projectId: ProjectId.make("other"),
+      updatedAt: at(9),
+      visibleItemCount: 3,
+    });
+    const selection = selectHomeRailThreads([pinned, otherProjectRecent], "updated_at");
+    expect(selection.pinned.map((thread) => thread.id)).toEqual([pinned.id]);
+    expect(selection.recent.map((thread) => thread.id)).toEqual([otherProjectRecent.id]);
+  });
+
+  it("keeps one recent thread per project and skips empty and pinned threads", () => {
+    const pinnedFresh = makeThreadFixture({
+      id: ThreadId.make("pinned-fresh"),
+      pinnedAt: at(1),
+      pinOrderKey: "a0",
+      updatedAt: at(8),
+      visibleItemCount: 5,
+    });
+    const olderSameProject = makeThreadFixture({
+      id: ThreadId.make("older"),
+      updatedAt: at(3),
+      visibleItemCount: 2,
+    });
+    const emptyThread = makeThreadFixture({
+      id: ThreadId.make("empty"),
+      updatedAt: at(7),
+      visibleItemCount: 0,
+    });
+    const selection = selectHomeRailThreads(
+      [pinnedFresh, olderSameProject, emptyThread],
+      "updated_at",
+    );
+    expect(selection.pinned.map((thread) => thread.id)).toEqual([pinnedFresh.id]);
+    expect(selection.recent).toEqual([]);
   });
 });
 
