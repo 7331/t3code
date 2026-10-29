@@ -173,9 +173,12 @@ export const primaryServerAvailableEditorsAtom = Atom.make(
 
 const EMPTY_ENVIRONMENT_THEMES: ReadonlyArray<EnvironmentTheme> = [];
 
+/** Null until the primary server's config arrives, so its first themes always land as a change. */
 export const primaryServerEnvironmentThemesAtom = Atom.make(
-  (get): ReadonlyArray<EnvironmentTheme> =>
-    get(primaryServerConfigAtom)?.environmentThemes ?? EMPTY_ENVIRONMENT_THEMES,
+  (get): ReadonlyArray<EnvironmentTheme> | null => {
+    const config = get(primaryServerConfigAtom);
+    return config === null ? null : (config.environmentThemes ?? EMPTY_ENVIRONMENT_THEMES);
+  },
 ).pipe(Atom.withLabel("web-primary-server-environment-themes"));
 
 export const providersIgnoringCheckedAtAtom = Atom.family((environmentId: EnvironmentId) =>

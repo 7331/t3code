@@ -4,7 +4,7 @@ import { MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
 import { useCustomThemes } from "../hooks/useCustomThemes";
 import { useEnvironmentThemeDefinitions } from "../hooks/useEnvironmentTheme";
 import { useTheme } from "../hooks/useTheme";
-import { getThemeDefinition } from "../themePalette";
+import { getThemeDefinition, STANDARD_THEME_PREFERENCE } from "../themePalette";
 import {
   ADDON_ICON_CLASS,
   ITEM_ICON_CLASS,
@@ -105,7 +105,7 @@ export function useCommandPaletteThemeItems() {
             const saved =
               previews.length === 1 && id !== null
                 ? setThemeHalf(previews[0]!.mode, id)
-                : setTheme(id ?? appearanceMode);
+                : setTheme(id ?? STANDARD_THEME_PREFERENCE);
             if (!saved) notifyThemeSaveFailure();
           },
         })),

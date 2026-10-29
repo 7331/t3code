@@ -42,11 +42,10 @@ const EMBER_THEME_ID = "ember" as const;
 const IRIS_THEME_ID = "iris" as const;
 export const THEME_FILE_VERSION = 1 as const;
 export const CUSTOM_THEMES_STORAGE_KEY = "t3code:themes:v1";
-export const THEME_FOLLOW_SYSTEM_STORAGE_KEY = "t3code:theme-follow-system";
 export const THEME_APPEARANCE_MODE_STORAGE_KEY = "t3code:theme-appearance-mode";
 export const THEME_HALVES_STORAGE_KEY = "t3code:theme-halves:v1";
-
-const LEGACY_T3_CHAT_DARK_THEME_ID = "t3-chat-dark";
+/** The stored preference for the standard theme; any other value is a palette id. */
+export const STANDARD_THEME_PREFERENCE = "system";
 
 export const ThemePreference = Schema.String;
 export type ThemePreference = typeof ThemePreference.Type;
@@ -314,10 +313,10 @@ export function publishedThemeDefinitions(
 
 // Every reconnect snapshot delivers a fresh but usually identical array; keeping the
 // previous one skips regenerating palettes and repainting the document for it.
-const publishedThemesAtom = Atom.make((get): ReadonlyArray<EnvironmentTheme> => {
+const publishedThemesAtom = Atom.make((get): ReadonlyArray<EnvironmentTheme> | null => {
   const next = get(primaryServerEnvironmentThemesAtom);
-  const previous = Option.getOrNull(get.self<ReadonlyArray<EnvironmentTheme>>());
-  return previous !== null && Equal.equals(previous, next) ? previous : next;
+  const previous = Option.getOrNull(get.self<ReadonlyArray<EnvironmentTheme> | null>());
+  return previous !== null && next !== null && Equal.equals(previous, next) ? previous : next;
 }).pipe(Atom.withLabel("web-published-environment-themes"));
 
 /**
@@ -326,7 +325,7 @@ const publishedThemesAtom = Atom.make((get): ReadonlyArray<EnvironmentTheme> => 
  * Kept alive because theme lookups read it outside React on every repaint.
  */
 export const environmentThemeDefinitionsAtom = Atom.make((get) =>
-  publishedThemeDefinitions(get(publishedThemesAtom)),
+  publishedThemeDefinitions(get(publishedThemesAtom) ?? []),
 ).pipe(Atom.keepAlive, Atom.withLabel("web-environment-theme-definitions"));
 
 function getEnvironmentThemes(): ReadonlyArray<ThemeDefinition> {
@@ -345,53 +344,34 @@ export function getStoredCustomThemeCollection(
   );
 }
 
+// Registered at import, so it runs before useTheme's storage listener repaints from the library.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === CUSTOM_THEMES_STORAGE_KEY || event.key === null) invalidateCustomThemes();
+  });
+}
+
 export function subscribeToCustomThemes(listener: () => void): () => void {
   customThemeListeners.add(listener);
   const unsubscribeEnvironment = subscribeAtomChanges(environmentThemeDefinitionsAtom, () =>
     listener(),
   );
-  if (typeof window === "undefined") {
-    return () => {
-      customThemeListeners.delete(listener);
-      unsubscribeEnvironment();
-    };
-  }
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key === CUSTOM_THEMES_STORAGE_KEY || event.key === null) {
-      invalidateCustomThemes();
-    }
-  };
-  window.addEventListener("storage", handleStorage);
-
   return () => {
     customThemeListeners.delete(listener);
     unsubscribeEnvironment();
-    window.removeEventListener("storage", handleStorage);
   };
 }
 
 const LEGACY_THEME_ID_ALIASES: Readonly<Record<string, string>> = {
-  [LEGACY_T3_CHAT_DARK_THEME_ID]: T3_CHAT_THEME_ID,
+  "t3-chat-dark": T3_CHAT_THEME_ID,
   "t3-grove": GROVE_THEME_ID,
   "t3-ocean": OCEAN_THEME_ID,
   "t3-ember": EMBER_THEME_ID,
   "t3-iris": IRIS_THEME_ID,
 };
 
-function normalizeThemeId(themeId: string): string {
+export function canonicalThemeId(themeId: string): string {
   return LEGACY_THEME_ID_ALIASES[themeId] ?? themeId;
-}
-
-export function canonicalThemePreference(theme: string): string {
-  return theme === LEGACY_T3_CHAT_DARK_THEME_ID ? theme : normalizeThemeId(theme);
-}
-
-function themeIdFromPreference(theme: ThemePreference): string {
-  return normalizeThemeId(theme);
-}
-
-function legacyThemeMode(theme: ThemePreference): ThemeAppearance | null {
-  return theme === LEGACY_T3_CHAT_DARK_THEME_ID ? "dark" : null;
 }
 
 export function getStandardThemeColors(appearance: ThemeAppearance): ThemeColors {
@@ -1173,7 +1153,7 @@ export function updateThemeColorFamily(
 const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = BUILT_IN_THEMES;
 
 export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | null {
-  const themeId = themeIdFromPreference(theme);
+  const themeId = canonicalThemeId(theme);
   return (
     BUILT_IN_THEME_DEFINITIONS.find((definition) => definition.id === themeId) ??
     getCustomThemes().find((definition) => definition.id === themeId) ??
@@ -1183,7 +1163,7 @@ export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | nu
 }
 
 export function themeAllowsSidebarArtwork(theme: ThemePreference): boolean {
-  const themeId = themeIdFromPreference(theme);
+  const themeId = canonicalThemeId(theme);
   return (
     BUILT_IN_THEME_DEFINITIONS.find((definition) => definition.id === themeId)?.sidebarArtwork ===
     true
@@ -1206,14 +1186,6 @@ export function getThemeColorsForMode(
 
 export function getThemeModes(theme: ThemeDefinition): ReadonlyArray<ThemeAppearance> {
   return (["light", "dark"] as const).filter((mode) => getThemeColorsForMode(theme, mode) !== null);
-}
-
-export function getThemePreferenceMode(theme: ThemePreference): ThemeAppearance | null {
-  if (theme === "system") return null;
-  if (theme === "light" || theme === "dark") return theme;
-  const legacyMode = legacyThemeMode(theme);
-  if (legacyMode) return legacyMode;
-  return getThemeDefinition(theme)?.appearance ?? null;
 }
 
 export function themeIdFromName(name: string): string {
@@ -1588,7 +1560,7 @@ export function getThemeColorVariable(role: ThemeColorRole): string {
   return APP_THEME_VARIABLES[role];
 }
 
-export const THEME_PREVIEW_ID = "__preview";
+const THEME_PREVIEW_ID = "__preview";
 
 /** Callers must restore the stored theme with refreshTheme when the draft closes. */
 export function applyThemeColorPreview(colors: ThemeColors, appearance: ThemeAppearance): void {
@@ -1605,89 +1577,162 @@ export function applyThemeColorPreview(colors: ThemeColors, appearance: ThemeApp
   setThemePreviewAppearance(appearance);
 }
 
-export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppearance): void {
-  if (typeof document === "undefined") return;
+export type ThemePaint = Readonly<{
+  themeId: string | null;
+  variables: Readonly<Record<string, string>>;
+}>;
 
+export function resolveThemePaint(theme: ThemePreference, appearance: ThemeAppearance): ThemePaint {
+  const palette = getThemeDefinition(theme);
+  if (palette === null) {
+    return {
+      themeId: null,
+      variables: contextChipVariables(getStandardPaintedThemeColors(appearance)),
+    };
+  }
+  const colors = getThemeColorsForMode(palette, appearance) ?? palette.colors;
+  return {
+    themeId: palette.id,
+    variables: {
+      ...Object.fromEntries(
+        THEME_COLOR_ROLES.map((role) => [APP_THEME_VARIABLES[role], colors[role]]),
+      ),
+      ...contextChipVariables(colors),
+    },
+  };
+}
+
+/** The paint for each appearance the theme can show: both while it follows the system. */
+export function resolveThemePaints(
+  theme: ThemePreference,
+  appearanceMode: ThemePreferenceMode,
+  halves: ThemeHalves | null,
+): Partial<Record<ThemeAppearance, ThemePaint>> {
+  const desktopTheme = resolveDesktopTheme(theme, appearanceMode, halves);
+  const appearances = desktopTheme === "system" ? (["light", "dark"] as const) : [desktopTheme];
+  return Object.fromEntries(
+    appearances.map((appearance) => [
+      appearance,
+      resolveThemePaint(resolveThemeHalf(theme, halves, appearance), appearance),
+    ]),
+  );
+}
+
+export function applyThemePaint(paint: ThemePaint, appearance: ThemeAppearance): void {
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (!root?.style) return;
 
   setThemePreviewAppearance(null);
-  const palette = getThemeDefinition(theme);
-
-  if (palette) {
-    root.dataset.themeId = palette.id;
-    const mode = appearance ?? legacyThemeMode(theme) ?? palette.appearance;
-    const colors = getThemeColorsForMode(palette, mode) ?? palette.colors;
-    for (const [role, value] of Object.entries(colors) as Array<[ThemeColorRole, string]>) {
-      root.style.setProperty(APP_THEME_VARIABLES[role], value);
-    }
-    applyContextChipVariables(root, colors);
-    return;
-  }
-
-  delete root.dataset.themeId;
-  for (const variable of Object.values(APP_THEME_VARIABLES)) {
+  if (paint.themeId === null) delete root.dataset.themeId;
+  else root.dataset.themeId = paint.themeId;
+  root.classList.toggle("dark", appearance === "dark");
+  for (const variable of [
+    ...Object.values(APP_THEME_VARIABLES),
+    CONTEXT_CHIP_MESSAGE_VARIABLE,
+    CONTEXT_CHIP_INVALID_VARIABLE,
+  ]) {
     root.style.removeProperty(variable);
   }
-  applyContextChipVariables(root, getStandardPaintedThemeColors(appearance ?? "light"));
+  for (const [variable, value] of Object.entries(paint.variables)) {
+    root.style.setProperty(variable, value);
+  }
+  syncBrowserChromeTheme();
+}
+
+const THEME_COLOR_META_NAME = "theme-color";
+const DYNAMIC_THEME_COLOR_SELECTOR = `meta[name="${THEME_COLOR_META_NAME}"][data-dynamic-theme-color="true"]`;
+
+function ensureThemeColorMetaTag(): HTMLMetaElement {
+  let element = document.querySelector<HTMLMetaElement>(DYNAMIC_THEME_COLOR_SELECTOR);
+  if (element) {
+    return element;
+  }
+
+  element = document.createElement("meta");
+  element.name = THEME_COLOR_META_NAME;
+  element.setAttribute("data-dynamic-theme-color", "true");
+  document.head.append(element);
+  return element;
+}
+
+function normalizeBrowserChromeColor(value: string | null | undefined): string | null {
+  const normalizedValue = value?.trim().toLowerCase();
+  if (
+    !normalizedValue ||
+    normalizedValue === "transparent" ||
+    normalizedValue === "rgba(0, 0, 0, 0)" ||
+    normalizedValue === "rgba(0 0 0 / 0)"
+  ) {
+    return null;
+  }
+
+  return value?.trim() ?? null;
+}
+
+function resolveBrowserChromeSurface(): HTMLElement {
+  return (
+    document.querySelector<HTMLElement>("main[data-slot='sidebar-inset']") ??
+    document.querySelector<HTMLElement>("[data-slot='sidebar-inner']") ??
+    document.body
+  );
+}
+
+export function syncBrowserChromeTheme() {
+  if (typeof document === "undefined" || typeof getComputedStyle === "undefined") return;
+  const rootStyles = getComputedStyle(document.documentElement);
+  const themeChromeColor = document.documentElement.dataset.themeId
+    ? normalizeBrowserChromeColor(rootStyles.getPropertyValue("--app-chrome-background"))
+    : null;
+  const surfaceColor = normalizeBrowserChromeColor(
+    getComputedStyle(resolveBrowserChromeSurface()).backgroundColor,
+  );
+  const fallbackColor = normalizeBrowserChromeColor(
+    getComputedStyle(document.body).backgroundColor,
+  );
+  const backgroundColor = themeChromeColor ?? surfaceColor ?? fallbackColor;
+  if (!backgroundColor) return;
+
+  document.documentElement.style.backgroundColor = backgroundColor;
+  document.body.style.backgroundColor = backgroundColor;
+  const themeColorMetas = document.querySelectorAll<HTMLMetaElement>(
+    `meta[name="${THEME_COLOR_META_NAME}"]`,
+  );
+  if (themeColorMetas.length === 0) {
+    ensureThemeColorMetaTag().setAttribute("content", backgroundColor);
+    return;
+  }
+  for (const element of themeColorMetas) {
+    element.setAttribute("content", backgroundColor);
+  }
 }
 
 export function resolveThemeAppearance(
   theme: ThemePreference,
   systemDark: boolean,
-  followSystem?: boolean,
-  appearanceMode?: ThemePreferenceMode,
-  halves?: ThemeHalves | null,
-): "light" | "dark" {
-  const systemAppearance = systemDark ? "dark" : "light";
-  const mode = appearanceMode ?? ((followSystem ?? theme === "system") ? "system" : null);
-  if (mode === "system") {
-    if (halves?.[systemAppearance]) return systemAppearance;
-    const definition = getThemeDefinition(theme);
-    return definition && getThemeColorsForMode(definition, systemAppearance) === null
-      ? definition.appearance
-      : systemAppearance;
-  }
-  if (mode === "light" || mode === "dark") {
-    if (halves?.[mode]) return mode;
-    const definition = getThemeDefinition(theme);
-    return definition && getThemeColorsForMode(definition, mode) === null
-      ? definition.appearance
-      : mode;
-  }
-  return getThemePreferenceMode(theme) ?? "light";
+  appearanceMode: ThemePreferenceMode,
+  halves: ThemeHalves | null,
+): ThemeAppearance {
+  const wanted = appearanceMode === "system" ? (systemDark ? "dark" : "light") : appearanceMode;
+  if (halves?.[wanted]) return wanted;
+  const definition = getThemeDefinition(theme);
+  return definition && getThemeColorsForMode(definition, wanted) === null
+    ? definition.appearance
+    : wanted;
 }
 
 export function resolveDesktopTheme(
   theme: ThemePreference,
-  followSystem?: boolean,
-  appearanceMode?: ThemePreferenceMode,
-  halves?: ThemeHalves | null,
-): "light" | "dark" | "system" {
-  const mode = appearanceMode ?? ((followSystem ?? theme === "system") ? "system" : null);
-  if (mode === "system") {
-    const definition = getThemeDefinition(theme);
-    const hasLightMode =
-      halves?.light !== undefined ||
-      (definition !== null && getThemeColorsForMode(definition, "light") !== null);
-    const hasDarkMode =
-      halves?.dark !== undefined ||
-      (definition !== null && getThemeColorsForMode(definition, "dark") !== null);
-    return definition && (!hasLightMode || !hasDarkMode) ? definition.appearance : "system";
-  }
-  if (mode === "light" || mode === "dark") {
-    if (halves?.[mode]) return mode;
-    const definition = getThemeDefinition(theme);
-    return definition && getThemeColorsForMode(definition, mode) === null
-      ? definition.appearance
-      : mode;
-  }
-  return getThemePreferenceMode(theme) ?? "system";
+  appearanceMode: ThemePreferenceMode,
+  halves: ThemeHalves | null,
+): ThemePreferenceMode {
+  const light = resolveThemeAppearance(theme, false, appearanceMode, halves);
+  const dark = resolveThemeAppearance(theme, true, appearanceMode, halves);
+  return light === dark ? light : "system";
 }
 
 export function isKnownThemePreference(theme: string): boolean {
-  if (theme === "light" || theme === "dark" || theme === "system") return true;
-  return getThemeDefinition(theme) !== null;
+  return theme === STANDARD_THEME_PREFERENCE || getThemeDefinition(theme) !== null;
 }
 
 export type ThemeHalves = Readonly<{ light?: string; dark?: string }>;

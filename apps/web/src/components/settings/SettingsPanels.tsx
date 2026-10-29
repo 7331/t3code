@@ -46,6 +46,7 @@ import {
   readThemePreference,
   useTheme,
 } from "../../hooks/useTheme";
+import { STANDARD_THEME_PREFERENCE } from "../../themePalette";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -407,8 +408,8 @@ export function useSettingsRestore(onRestored?: () => void) {
   const {
     theme,
     setTheme,
-    followSystem,
-    setFollowSystem,
+    appearanceMode,
+    setAppearanceMode,
     setThemeHalf,
     clearThemeHalves,
     themeHalves,
@@ -423,8 +424,8 @@ export function useSettingsRestore(onRestored?: () => void) {
   const isBackgroundActivityDirty = hasChangedBackgroundActivitySettings(settings);
 
   const changedSettingLabels = [
-    ...(theme !== "system" ? ["Theme"] : []),
-    ...(!followSystem ? ["Follow system"] : []),
+    ...(theme !== STANDARD_THEME_PREFERENCE ? ["Theme"] : []),
+    ...(appearanceMode !== "system" ? ["Follow system"] : []),
     ...(themeHalves !== null ? ["Theme mix"] : []),
     ...(settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast
       ? ["Contrast"]
@@ -572,9 +573,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       previousTheme = readThemePreference();
     } catch {}
     const liveHalves = readThemeHalves();
-    const needsThemeReset = previousTheme !== "system";
+    const needsThemeReset = previousTheme !== STANDARD_THEME_PREFERENCE;
     const needsMixReset = liveHalves !== null;
-    const needsFollowSystemReset = readAppearanceModePreference(previousTheme) !== "system";
+    const needsFollowSystemReset = readAppearanceModePreference() !== "system";
     const notifyThemeRestoreFailure = () => {
       toastManager.add(
         stackedThreadToast({
@@ -591,7 +592,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       if (previousHalves?.light) setThemeHalf("light", previousHalves.light);
       if (previousHalves?.dark) setThemeHalf("dark", previousHalves.dark);
     };
-    if (needsThemeReset && !setTheme("system")) {
+    if (needsThemeReset && !setTheme(STANDARD_THEME_PREFERENCE)) {
       notifyThemeRestoreFailure();
       return;
     }
@@ -600,7 +601,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       notifyThemeRestoreFailure();
       return;
     }
-    if (needsFollowSystemReset && !setFollowSystem(true)) {
+    if (needsFollowSystemReset && !setAppearanceMode("system")) {
       rollbackThemeState();
       notifyThemeRestoreFailure();
       return;
