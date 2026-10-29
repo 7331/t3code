@@ -32,8 +32,6 @@ export function ComposerCodeBlockLanguagePicker(props: {
   language: string;
   theme: "light" | "dark";
   disabled: boolean;
-  /** Hides the chevron until the surrounding code block is hovered or focused. */
-  quietChevron?: boolean;
   onChange: (language: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -78,13 +76,7 @@ export function ComposerCodeBlockLanguagePicker(props: {
         >
           <LanguageIcon language={current} theme={props.theme} />
           <span className="max-w-40 truncate">{codeLanguageLabel(props.language)}</span>
-          <ChevronDownIcon
-            className={
-              props.quietChevron
-                ? "opacity-0 pointer-coarse:opacity-60 group-focus-within/codeblock:opacity-60 group-hover/codeblock:opacity-60"
-                : "opacity-60"
-            }
-          />
+          <ChevronDownIcon className="opacity-60" />
         </ComboboxTrigger>
         <ComboboxPopup align="start" className="w-56">
           <ComboboxSearchInput
