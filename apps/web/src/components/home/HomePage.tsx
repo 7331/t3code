@@ -46,16 +46,18 @@ export function HomePage() {
     >
       {pinnedThreads.length === 0 ? (
         bootstrapped ? (
-          <Empty>
+          <Empty size="compact">
             <EmptyHeader>
               <EmptyTitle>No pinned threads</EmptyTitle>
-              <EmptyDescription>Pin threads in the sidebar to follow them here.</EmptyDescription>
+              <EmptyDescription>
+                Right-click a thread in the sidebar and choose Pin thread.
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : null
       ) : (
         <>
-          <HomeSectionHeading title="Pinned threads" />
+          <HomeSectionHeading title={`Pinned · ${pinnedThreads.length}`} />
           <HomeCardGrid
             cards={pinnedThreads.map((thread) => {
               const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));

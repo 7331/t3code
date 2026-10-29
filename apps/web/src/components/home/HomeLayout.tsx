@@ -61,14 +61,14 @@ export function HomePageShell({
           <WorkspaceBreadcrumb ariaLabel={breadcrumbLabel}>{breadcrumb}</WorkspaceBreadcrumb>
         </WorkspacePageHeader>
         <ScrollArea className="min-h-0 flex-1">
-          <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">{children}</div>
+          <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">{children}</div>
         </ScrollArea>
       </div>
     </SidebarInset>
   );
 }
 
-/** A section title over the cards, with an optional line saying why they are the ones shown. */
+/** A muted section label over the cards, with an optional line saying why they are the ones shown. */
 export function HomeSectionHeading({
   title,
   description,
@@ -77,8 +77,8 @@ export function HomeSectionHeading({
   readonly description?: string | null;
 }) {
   return (
-    <div className="mb-4 flex flex-col gap-0.5">
-      <h2 className="text-sm font-medium">{title}</h2>
+    <div className="mb-4 flex flex-col gap-0.5 px-1">
+      <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
       {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
     </div>
   );
@@ -93,7 +93,7 @@ export function HomeCardGrid({
   readonly cards: ReadonlyArray<{ readonly key: string; readonly card: ReactNode }>;
 }) {
   return (
-    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
       {cards.map(({ key, card }, index) => (
         <div
           key={key}
