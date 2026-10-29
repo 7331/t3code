@@ -13,6 +13,8 @@ import { filterSidebarV2VisibleThreads } from "../Sidebar.logic";
 
 /** Each card holds a live subscription to its thread's detail stream, so Home stays a handful. */
 export const HOME_MAX_CARDS = 6;
+/** The rail's two lists stay short enough to scan without scrolling. */
+const HOME_RAIL_MAX_PER_SECTION = 6;
 /** Home is for glancing across threads, so a card previews only the last few messages. */
 const HOME_CARD_MESSAGE_LIMIT = 3;
 
@@ -64,6 +66,41 @@ export function selectHomeThreads<T extends HomeThreadInput>(
     if (recent.length === HOME_MAX_CARDS) break;
   }
   return { source: "recent", threads: recent };
+}
+
+export interface HomeRailSelection<T> {
+  readonly pinned: ReadonlyArray<T>;
+  readonly recent: ReadonlyArray<T>;
+}
+
+/**
+ * The rail shows both groups at once: pinned threads in the sidebar's pin order,
+ * then the latest thread with messages in each project that is not already pinned.
+ */
+export function selectHomeRailThreads<T extends HomeThreadInput>(
+  threads: ReadonlyArray<T>,
+  sortOrder: SidebarThreadSortOrder,
+): HomeRailSelection<T> {
+  const visible = filterSidebarV2VisibleThreads(threads, null);
+  const pinned = sortPinnedThreadsByOrderKey(
+    visible.filter((thread) => thread.pinnedAt !== null),
+  ).slice(0, HOME_RAIL_MAX_PER_SECTION);
+  const pinnedKeys = new Set(pinned.map((thread) => `${thread.environmentId}:${thread.id}`));
+  // A project whose freshest thread is pinned has its recent slot filled already.
+  const seenProjects = new Set(
+    pinned.map((thread) => `${thread.environmentId}:${thread.projectId}`),
+  );
+  const recent: T[] = [];
+  for (const thread of sortThreads(visible, sortOrder)) {
+    if (thread.visibleItemCount === 0) continue;
+    if (pinnedKeys.has(`${thread.environmentId}:${thread.id}`)) continue;
+    const projectKey = `${thread.environmentId}:${thread.projectId}`;
+    if (seenProjects.has(projectKey)) continue;
+    seenProjects.add(projectKey);
+    recent.push(thread);
+    if (recent.length === HOME_RAIL_MAX_PER_SECTION) break;
+  }
+  return { pinned, recent };
 }
 
 /** A card's transcript line: a message, or one muted line for the agent work between messages. */

@@ -15,6 +15,7 @@ import {
   HomeSectionHeading,
   useCollapsedHomeCards,
 } from "./HomeLayout";
+import { HomeRail } from "./HomeRail";
 import { HomeThreadCard } from "./HomeThreadCard";
 import { selectHomeThreads } from "./homeThreads.logic";
 import { useHomeCardActions } from "./useHomeCardActions";
@@ -42,47 +43,52 @@ export function HomePage() {
         </WorkspaceBreadcrumbItem>
       }
     >
-      {selection.threads.length === 0 ? (
-        bootstrapped ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>No threads yet</EmptyTitle>
-              <EmptyDescription>
-                Start a thread in any project and it shows up here.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : null
-      ) : (
-        <>
-          <HomeSectionHeading
-            title={selection.source === "pinned" ? "Pinned threads" : "Recent threads"}
-            description={
-              selection.source === "recent"
-                ? "Nothing is pinned, so this shows the latest thread with messages in each project. Pin threads to choose what stays here."
-                : null
-            }
-          />
-          <HomeCardGrid
-            cards={selection.threads.map((thread) => {
-              const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-              const actions = cardActions(thread);
-              return {
-                key,
-                card: (
-                  <HomeThreadCard
-                    thread={thread}
-                    collapsed={collapsed.isCollapsed(key)}
-                    onToggleCollapsed={() => collapsed.toggle(key)}
-                    pin={actions.pin}
-                    settle={actions.settle}
-                  />
-                ),
-              };
-            })}
-          />
-        </>
-      )}
+      <div className="flex min-h-0 items-start gap-6">
+        <HomeRail threads={threads} sortOrder={sortOrder} className="sticky top-0" />
+        <div className="min-w-0 flex-1">
+          {selection.threads.length === 0 ? (
+            bootstrapped ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>No threads yet</EmptyTitle>
+                  <EmptyDescription>
+                    Start a thread in any project and it shows up here.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : null
+          ) : (
+            <>
+              <HomeSectionHeading
+                title={selection.source === "pinned" ? "Pinned threads" : "Recent threads"}
+                description={
+                  selection.source === "recent"
+                    ? "Nothing is pinned, so this shows the latest thread with messages in each project. Pin threads to choose what stays here."
+                    : null
+                }
+              />
+              <HomeCardGrid
+                cards={selection.threads.map((thread) => {
+                  const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+                  const actions = cardActions(thread);
+                  return {
+                    key,
+                    card: (
+                      <HomeThreadCard
+                        thread={thread}
+                        collapsed={collapsed.isCollapsed(key)}
+                        onToggleCollapsed={() => collapsed.toggle(key)}
+                        pin={actions.pin}
+                        settle={actions.settle}
+                      />
+                    ),
+                  };
+                })}
+              />
+            </>
+          )}
+        </div>
+      </div>
     </HomePageShell>
   );
 }
