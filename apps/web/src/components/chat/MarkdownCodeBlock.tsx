@@ -62,7 +62,7 @@ export function MarkdownCodeBlockFrame({
   return (
     <Wrapper
       dir="ltr"
-      className="chat-markdown-codeblock group/codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
+      className="chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
       data-language={language}
       data-wrap={wrapped ? "true" : "false"}
     >
@@ -224,14 +224,9 @@ export function MarkdownCodeBlock({
               language={language}
               theme={theme}
               disabled={isStreaming}
-              quietChevron
               onChange={(next) => onLanguageChange(next || "text")}
             />
-            {fenceTitle ? (
-              <span className="truncate font-mono text-2xs text-muted-foreground">
-                {fenceTitle}
-              </span>
-            ) : null}
+            {fenceTitle ? <span className="truncate font-mono text-2xs">{fenceTitle}</span> : null}
           </span>
         ) : undefined
       }
