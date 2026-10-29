@@ -5,7 +5,6 @@ import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
 import { CONTEXT_CHIP_ACCENTS, contextChipColorVariable } from "./lib/contextChipAccents";
 
 import {
-  applyThemePalette,
   contextChipVariables,
   getThemeColorsForMode,
   getThemeModes,
@@ -19,6 +18,7 @@ import {
   replaceCustomThemeCollection,
   resolveDesktopTheme,
   resolveThemeAppearance,
+  resolveThemePaint,
   serializeThemeFile,
   T3_CHAT_THEME,
   GROVE_THEME,
@@ -268,10 +268,10 @@ describe("theme files", () => {
       text: canonical("#eef5ff"),
     });
     expect(getThemeModes(T3_CHAT_THEME)).toEqual(["light", "dark"]);
-    expect(resolveThemeAppearance(T3_CHAT_THEME.id, true, true)).toBe("dark");
-    expect(resolveDesktopTheme(T3_CHAT_THEME.id, true)).toBe("system");
-    expect(resolveThemeAppearance(T3_CHAT_THEME.id, false, false, "dark")).toBe("dark");
-    expect(resolveDesktopTheme(T3_CHAT_THEME.id, false, "dark")).toBe("dark");
+    expect(resolveThemeAppearance(T3_CHAT_THEME.id, true, "system", null)).toBe("dark");
+    expect(resolveDesktopTheme(T3_CHAT_THEME.id, "system", null)).toBe("system");
+    expect(resolveThemeAppearance(T3_CHAT_THEME.id, false, "dark", null)).toBe("dark");
+    expect(resolveDesktopTheme(T3_CHAT_THEME.id, "dark", null)).toBe("dark");
     expect(JSON.parse(serializeThemeFile(theme)).variants.dark).toMatchObject({
       canvas: canonical("#101827"),
       text: canonical("#eef5ff"),
@@ -625,34 +625,17 @@ describe("context chip colors", () => {
       light: ["#fcfcfc", "#ffffff", "#ebebed"],
       dark: ["#000000", "#0a0a0a", "#111111", "#141414", "#1e1e1e"],
     } as const;
-    const properties = new Map<string, string>();
-    vi.stubGlobal("window", { localStorage: { getItem: () => null } });
-    vi.stubGlobal("document", {
-      documentElement: {
-        dataset: {},
-        style: {
-          setProperty: (name: string, value: string) => properties.set(name, value),
-          removeProperty: (name: string) => properties.delete(name),
-        },
-      },
-    });
-    invalidateCustomThemes();
-    try {
-      for (const appearance of ["light", "dark"] as const) {
-        applyThemePalette("system", appearance);
-        for (const kind of Object.keys(CONTEXT_CHIP_ACCENTS) as Array<
-          keyof typeof CONTEXT_CHIP_ACCENTS
-        >) {
-          for (const surface of painted[appearance]) {
-            expect(
-              contrastRatio(properties.get(contextChipColorVariable(kind))!, surface),
-            ).toBeGreaterThanOrEqual(5);
-          }
+    for (const appearance of ["light", "dark"] as const) {
+      const { variables } = resolveThemePaint("system", appearance);
+      for (const kind of Object.keys(CONTEXT_CHIP_ACCENTS) as Array<
+        keyof typeof CONTEXT_CHIP_ACCENTS
+      >) {
+        for (const surface of painted[appearance]) {
+          expect(
+            contrastRatio(variables[contextChipColorVariable(kind)]!, surface),
+          ).toBeGreaterThanOrEqual(5);
         }
       }
-    } finally {
-      vi.unstubAllGlobals();
-      invalidateCustomThemes();
     }
   });
 
@@ -707,11 +690,11 @@ describe("stored theme preferences", () => {
     });
     invalidateCustomThemes();
     try {
-      expect(resolveThemeAppearance("paper", true, true)).toBe("light");
+      expect(resolveThemeAppearance("paper", true, "system", null)).toBe("light");
       const halves = { dark: GROVE_THEME.id };
-      expect(resolveThemeAppearance("paper", true, true, undefined, halves)).toBe("dark");
-      expect(resolveThemeAppearance("paper", false, false, "dark", halves)).toBe("dark");
-      expect(resolveDesktopTheme("paper", true, undefined, halves)).toBe("system");
+      expect(resolveThemeAppearance("paper", true, "system", halves)).toBe("dark");
+      expect(resolveThemeAppearance("paper", false, "dark", halves)).toBe("dark");
+      expect(resolveDesktopTheme("paper", "system", halves)).toBe("system");
     } finally {
       vi.unstubAllGlobals();
       invalidateCustomThemes();

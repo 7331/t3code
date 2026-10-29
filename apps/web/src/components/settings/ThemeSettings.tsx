@@ -27,6 +27,7 @@ import {
   GROVE_THEME,
   IRIS_THEME,
   OCEAN_THEME,
+  STANDARD_THEME_PREFERENCE,
 } from "../../themePalette";
 import {
   AlertDialog,
@@ -577,7 +578,7 @@ export function ThemeLibrary({
     // Read raw halves before persistTheme clears them; themeHalves omits published themes not yet streamed
     // in.
     const storedHalves = readThemeHalvesRaw();
-    if (removesBase && !persistTheme(appearanceMode === "system" ? "system" : appearanceMode)) {
+    if (removesBase && !persistTheme(STANDARD_THEME_PREFERENCE)) {
       return;
     }
     for (const appearance of ["light", "dark"] as const) {
@@ -609,7 +610,7 @@ export function ThemeLibrary({
       // Read raw before persistTheme clears the mix; unstreamed published halves must not fall back to the
       // base.
       const otherOwner = readThemeHalvesRaw()[otherAppearance] ?? baseCardId;
-      if (!persistTheme(appearanceMode === "system" ? "system" : appearanceMode)) return;
+      if (!persistTheme(STANDARD_THEME_PREFERENCE)) return;
       if (!setThemeHalf(otherAppearance, otherOwner)) {
         setTheme(theme);
         notifyThemeSaveFailure();
@@ -735,7 +736,7 @@ export function ThemeLibrary({
                 initialAppearance,
               })
             }
-            onUse={() => persistTheme(appearanceMode === "system" ? "system" : appearanceMode)}
+            onUse={() => persistTheme(STANDARD_THEME_PREFERENCE)}
             onUseMode={handlePairPick(null)}
             theme={standardTheme}
           />

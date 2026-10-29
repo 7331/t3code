@@ -197,8 +197,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
      by the composer, its context strip and attached banners. */
   --shadow-composer: 0 1px 2px rgb(0 0 0 / 5%);
   --shadow-composer-dark: 0 14px 32px -18px rgb(0 0 0 / 75%);
-  /* Overlap the lower toolbar backdrop by one pixel to cover the composer seam. */
-  --spacing-composer-seam: calc(var(--spacing) * 4 - 1px);
   /* Dark-mode shade where an attached surface meets the composer: 10px of
      shadow fading away from the seam. Inline, so the offsets resolve on the
      element. below: the context strip under the composer (1rem seam, faint
@@ -1228,30 +1226,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
-/* Keep both sidebar implementations (default and legacy) on the same quiet
-   zinc hierarchy: zinc-50 navigation, zinc-25 hover, and white selected/raised
-   surfaces. */
+/* Without a theme the sidebar inherits the light :root palette; in dark it
+   keeps its own true-black hierarchy. */
 [data-app-sidebar] {
-  --background: var(--color-zinc-25);
-  --foreground: var(--color-zinc-900);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-900);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-300);
-  --sidebar: var(--color-zinc-50);
-  --sidebar-foreground: var(--color-zinc-900);
-  --sidebar-muted-foreground: var(--color-zinc-500);
-  --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: var(--color-zinc-25);
-  --sidebar-row-active: var(--color-white);
-  --sidebar-row-selected: var(--color-white);
-  --sidebar-border: var(--color-zinc-200);
-  --sidebar-stage-fade: var(--sidebar);
-
   @variant dark {
     --background: #000;
     --foreground: #f1f3f7;
