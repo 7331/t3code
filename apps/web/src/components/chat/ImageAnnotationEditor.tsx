@@ -1,17 +1,14 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useState } from "react";
+import type { PainterroExportableImage, PainterroInstance } from "painterro";
 
+import { isEditableFocused } from "../../lib/editableFocus";
+import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
+import { Empty, EmptyDescription } from "../ui/empty";
+import { Spinner } from "../ui/spinner";
 import { toastManager } from "../ui/toast";
 
-export function annotatedImageFileName(originalName: string): string {
-  const stem = originalName.replace(/\.[A-Za-z0-9]+$/, "");
-  return `${stem.length > 0 ? stem : "image"}-edited.png`;
-}
-
-/**
- * The image editor behind the expanded preview. Painterro is loaded lazily so
- * its chunk only downloads when an image is actually edited; its own toolbar
- * (arrow, text, shapes, crop, pixelize) replaces any custom tooling here.
- */
+/** Painterro editor behind the expanded preview, imported lazily so its chunk loads only on edit. */
 export function ImageAnnotationEditor({
   src,
   name,
@@ -25,101 +22,85 @@ export function ImageAnnotationEditor({
 }) {
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   const holderId = `painterro-holder-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  // The instance outlives renders; the effect below owns its full lifecycle.
-  const editorRef = useRef<import("painterro").PainterroInstance | null>(null);
 
-  // Fetch the bytes into a data URL: Painterro needs an embeddable source, and
-  // a fetched copy keeps cross-origin asset URLs out of its loader.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps an external Painterro instance mounted in the holder for exactly this component's lifetime
+  const saveEditedImage = useEffectEvent(
+    async (image: PainterroExportableImage, done: (saved: boolean) => void) => {
+      try {
+        const blob = await image.asBlob("image/png");
+        const stem = name.replace(/(-edited)?(\.[A-Za-z0-9]+)?$/, "") || "image";
+        onApply(new File([blob], `${stem}-edited.png`, { type: "image/png" }));
+        done(true);
+      } catch (cause) {
+        toastManager.add({
+          type: "error",
+          title: "Could not save the edited image",
+          description: cause instanceof Error ? cause.message : "Please try again.",
+        });
+        done(false);
+      }
+    },
+  );
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- mounts an external Painterro instance into the holder for this component's lifetime
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch(src);
-        if (!response.ok) throw new Error("The image could not be loaded.");
-        const blob = await response.blob();
+    let editor: PainterroInstance | null = null;
+    // Painterro only checks ctrlKey, so map Cmd+Z / Cmd+Shift+Z for Mac.
+    const undoWithCommandKey = (event: KeyboardEvent) => {
+      if (!event.metaKey || event.key.toLowerCase() !== "z" || isEditableFocused(event.target))
+        return;
+      event.preventDefault();
+      if (event.shiftKey) editor?.worklog.redoState();
+      else editor?.worklog.undoState();
+    };
+    import("painterro").then(
+      ({ default: painterroExport }) => {
         if (cancelled) return;
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(reader.error ?? new Error("Read failed."));
-          reader.readAsDataURL(blob);
-        });
-        if (cancelled) return;
-        const imported = (await import("painterro")) as unknown as {
-          default:
-            | typeof import("painterro").default
-            | { default?: typeof import("painterro").default };
-        };
-        // The package ships a webpack commonjs2 build whose factory sits one
-        // namespace deeper than the declared default export under some bundlers.
-        const createEditor =
-          typeof imported.default === "function" ? imported.default : imported.default?.default;
-        if (!createEditor) throw new Error("The image editor failed to load.");
-        if (cancelled) return;
-        const editor = createEditor({
+        // `type: module` gives the prod build node-mode CJS interop, nesting the factory one level deeper than dev.
+        const createPainterro =
+          typeof painterroExport === "function" ? painterroExport : painterroExport.default;
+        editor = createPainterro({
           id: holderId,
           defaultTool: "arrow",
           toolbarPosition: "top",
-          // Loading other files and the standalone close button belong to the
-          // host dialog, not the editor surface.
           hiddenTools: ["open", "close"],
-          saveHandler: (image, done) => {
-            void (async () => {
-              try {
-                const blob = await image.asBlob("image/png");
-                onApply(new File([blob], annotatedImageFileName(name), { type: "image/png" }));
-                done(true);
-              } catch (cause) {
-                toastManager.add({
-                  type: "error",
-                  title: "Could not save the edited image",
-                  description: cause instanceof Error ? cause.message : "Please try again.",
-                });
-                done(false);
-              }
-            })();
-          },
+          saveHandler: (image, done) => void saveEditedImage(image, done),
+          onImageLoaded: () => setStatus("ready"),
+          onImageFailedOpen: () => setStatus("failed"),
         });
-        editorRef.current = editor;
-        editor.show(dataUrl);
-        setStatus("ready");
-      } catch {
+        editor.show(src);
+        document.addEventListener("keydown", undoWithCommandKey);
+      },
+      () => {
         if (!cancelled) setStatus("failed");
-      }
-    })();
+      },
+    );
     return () => {
       cancelled = true;
-      editorRef.current?.hide();
-      editorRef.current = null;
+      editor?.hide();
+      document.removeEventListener("keydown", undoWithCommandKey);
     };
-    // Painterro is created once per mounted editor; name changes remount via key.
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies
-  }, [src]);
+  }, [src, holderId]);
 
-  // The holder div is always mounted: Painterro resolves its `id` target at
-  // construction, before any "ready" state would render it.
+  // The holder stays mounted: Painterro resolves its `id` when it is created.
   return (
     <div className="relative h-[min(var(--media-height),44rem)] w-[min(var(--media-width),52rem)] overflow-hidden rounded-lg bg-background shadow-2xl ring-1 ring-border/70">
-      {/* Painterro positions its toolbar and canvas absolutely inside the holder. */}
-      <div id={holderId} className="absolute inset-0" />
+      <div id={holderId} className={cn("absolute inset-0", status !== "ready" && "invisible")} />
       {status !== "ready" ? (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black p-6 text-center text-sm text-white">
-          {status === "failed" ? (
-            <p role="alert">This image could not be loaded for editing.</p>
+        <Empty className="absolute inset-0 z-10">
+          {status === "loading" ? (
+            <Spinner size="lg" tone="muted" />
           ) : (
-            <p>Loading image for editing…</p>
+            <>
+              <EmptyDescription role="alert">
+                This image could not be loaded for editing.
+              </EmptyDescription>
+              <Button variant="outline" size="sm" onClick={onCancel}>
+                Back to preview
+              </Button>
+            </>
           )}
-          {status === "failed" ? (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="rounded-md bg-white/10 px-3 py-1.5 text-xs ring-1 ring-white/20 hover:bg-white/20"
-            >
-              Back to preview
-            </button>
-          ) : null}
-        </div>
+        </Empty>
       ) : null}
     </div>
   );

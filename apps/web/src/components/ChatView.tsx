@@ -260,7 +260,6 @@ import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import type { ExpandedImageItem } from "./chat/ExpandedImagePreview";
-import { annotatedImageFileName } from "./chat/ImageAnnotationEditor";
 import {
   BranchRestoreConfirmHost,
   DeviceSetupDialogHost,
@@ -3052,43 +3051,28 @@ export default function ChatView(props: ChatViewProps) {
 
   const applyExpandedImageEdit = (item: ExpandedImageItem, file: File) => {
     const { addImages, replaceImage } = useComposerDraftStore.getState();
-    const name = annotatedImageFileName(item.name);
+    const editedImage: ComposerImageAttachment = {
+      type: "image",
+      id: item.composerImage?.id ?? randomUUID(),
+      name: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      previewUrl: URL.createObjectURL(file),
+      file,
+    };
     if (item.composerImage) {
-      // The uploaded bytes (if any) belong to the pre-edit image, so the
-      // replacement uploads again instead of reusing them.
+      // The uploaded bytes belong to the pre-edit image, so the replacement uploads again.
       releaseAttachmentUpload(item.composerImage.id);
-      replaceImage(composerDraftTarget, {
-        ...item.composerImage,
-        name,
-        mimeType: "image/png",
-        sizeBytes: file.size,
-        previewUrl: URL.createObjectURL(file),
-        file,
-      });
-      toastManager.add({ type: "success", title: `Replaced ${item.name} with the edited image.` });
+      replaceImage(composerDraftTarget, { ...item.composerImage, ...editedImage });
       return;
     }
-    const imageId = randomUUID();
-    const accepted = addImages(composerDraftTarget, [
-      {
-        type: "image",
-        id: imageId,
-        name,
-        mimeType: "image/png",
-        sizeBytes: file.size,
-        previewUrl: URL.createObjectURL(file),
-        file,
-      },
-    ]);
-    if (!accepted.includes(imageId)) {
-      toastManager.add({
-        type: "error",
-        title: "The draft rejected the edited image",
-        description: "It may be a duplicate, or the attachment limit was reached.",
-      });
-      return;
-    }
-    toastManager.add({ type: "success", title: `Added ${name} to the composer.` });
+    if (addImages(composerDraftTarget, [editedImage]).includes(editedImage.id)) return;
+    URL.revokeObjectURL(editedImage.previewUrl);
+    toastManager.add({
+      type: "error",
+      title: "The draft rejected the edited image",
+      description: "It may be a duplicate, or the attachment limit was reached.",
+    });
   };
   const applyExpandedImageEditStable = useStableCallback(applyExpandedImageEdit);
 

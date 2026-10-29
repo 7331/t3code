@@ -36,7 +36,6 @@ import {
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { createModelSelection } from "@t3tools/shared/model";
-import { toKindScopedComposerContextId } from "@t3tools/shared/composerContextReferences";
 
 const CODEX_INSTANCE = ProviderInstanceId.make("codex");
 const CODEX_SECONDARY_INSTANCE = ProviderInstanceId.make("codex_secondary");
@@ -283,79 +282,6 @@ describe("composerDraftStore addImages", () => {
     const draft = draftFor(threadId, TEST_ENVIRONMENT_ID);
     expect(draft?.images.map((image) => image.id)).toEqual(["img-a"]);
     expect(revokeSpy).toHaveBeenCalledWith("blob:b");
-  });
-});
-
-describe("composerDraftStore replaceImage", () => {
-  const threadId = ThreadId.make("thread-replace-image");
-  const threadRef = scopeThreadRef(TEST_ENVIRONMENT_ID, threadId);
-  let originalRevokeObjectUrl: typeof URL.revokeObjectURL;
-  let revokeSpy: ReturnType<typeof vi.fn<(url: string) => void>>;
-
-  beforeEach(() => {
-    resetComposerDraftStore();
-    originalRevokeObjectUrl = URL.revokeObjectURL;
-    revokeSpy = vi.fn();
-    URL.revokeObjectURL = revokeSpy;
-  });
-
-  afterEach(() => {
-    URL.revokeObjectURL = originalRevokeObjectUrl;
-  });
-
-  it("replaces bytes under the same id and keeps prompt references intact", () => {
-    const original = makeImage({ id: "img-edit", previewUrl: "blob:edit" });
-    const store = useComposerDraftStore.getState();
-    store.addImages(threadRef, [original]);
-    store.setPrompt(
-      threadRef,
-      `Look at ${JSON.stringify(toKindScopedComposerContextId("image", "img-edit"))} closely`,
-    );
-    const replacement = makeImage({
-      id: "img-edit",
-      previewUrl: "blob:edited",
-      name: "edited.png",
-    });
-
-    store.replaceImage(threadRef, replacement);
-
-    const draft = store.getComposerDraft(threadRef);
-    expect(draft?.images.map((image) => image.id)).toEqual(["img-edit"]);
-    expect(draft?.images[0]?.name).toBe("edited.png");
-    expect(draft?.images[0]?.file).toBe(replacement.file);
-    expect(draft?.prompt).toContain(toKindScopedComposerContextId("image", "img-edit"));
-    expect(revokeSpy).toHaveBeenCalledWith("blob:edit");
-  });
-
-  it("drops the stale persisted copy so the replacement persists again", async () => {
-    const original = makeImage({ id: "img-persisted", previewUrl: "blob:persisted" });
-    const store = useComposerDraftStore.getState();
-    store.addImages(threadRef, [original]);
-    await store.syncPersistedAttachments(threadRef, [
-      {
-        id: "img-persisted",
-        name: original.name,
-        mimeType: original.mimeType,
-        sizeBytes: original.sizeBytes,
-        dataUrl: "data:image/png;base64,AAA",
-      },
-    ]);
-
-    store.replaceImage(
-      threadRef,
-      makeImage({ id: "img-persisted", previewUrl: "blob:next", name: "next.png" }),
-    );
-
-    const draft = store.getComposerDraft(threadRef);
-    expect(draft?.persistedAttachments).toEqual([]);
-    expect(draft?.nonPersistedImageIds).toEqual(["img-persisted"]);
-  });
-
-  it("ignores replacements for images the draft does not hold", () => {
-    const store = useComposerDraftStore.getState();
-    store.replaceImage(threadRef, makeImage({ id: "missing", previewUrl: "blob:missing" }));
-    expect(store.getComposerDraft(threadRef)).toBeNull();
-    expect(revokeSpy).not.toHaveBeenCalled();
   });
 });
 

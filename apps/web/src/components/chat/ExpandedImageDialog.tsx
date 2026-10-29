@@ -78,13 +78,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   const [imageOffset, setImageOffset] = useState(0);
   const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [accessibilityDetailsSrc, setAccessibilityDetailsSrc] = useState<string | null>(null);
-  // Opening an image lands directly in the editor; only non-editable media
-  // (videos, failed loads) shows the plain viewer instead.
-  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(() =>
-    preview.images[preview.index]?.type === "video" || preview.images[preview.index]?.src === null
-      ? null
-      : preview.index,
-  );
+  const [editingSrc, setEditingSrc] = useState<string | null>(null);
   const zoomableImageRef = useRef<ZoomableImageHandle>(null);
   const [returnFocusTarget] = useState(() =>
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
@@ -121,12 +115,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
     setImageOffset((current) => current + direction);
   };
 
-  // Editing is keyed to the gallery index, so navigating away leaves edit mode
-  // instead of carrying an in-progress edit onto another image.
-  const editing = editingImageIndex === index;
-  const setEditing = (next: boolean) => {
-    setEditingImageIndex(next ? index : null);
-  };
+  const editing = editingSrc !== null && editingSrc === item?.src;
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.defaultPrevented || isContextMenuOpen() || event.target instanceof HTMLVideoElement)
@@ -234,13 +223,13 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
               ) : null
             ) : editing && canEditImage && item.src !== null ? (
               <ImageAnnotationEditor
-                key={`${index}:${item.src}`}
+                key={item.src}
                 src={item.src}
                 name={item.name}
-                onCancel={() => setEditing(false)}
+                onCancel={() => setEditingSrc(null)}
                 onApply={(file) => {
                   onApplyImageEdit?.(item, file);
-                  onClose();
+                  close();
                 }}
               />
             ) : item.src === null || failedImageSrc === item.src ? (
@@ -292,6 +281,11 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                 </Tooltip>
               ) : item.source ? (
                 <SnapShotContentsButton source={item.source} side="top" />
+              ) : null}
+              {canEditImage && !editing ? (
+                <Button onClick={() => setEditingSrc(item.src)} size="micro" variant="overlay">
+                  Edit
+                </Button>
               ) : null}
             </div>
           </div>

@@ -188,8 +188,7 @@ export function buildExpandedImagePreview(
             name: image.name,
             mimeType: image.mimeType,
             source: image.source,
-            // Only the composer's own pending images carry their draft record, which
-            // marks the preview as editable in place.
+            // Pending composer images carry their draft record, which makes them editable in place.
             composerImage: "file" in image && image.file instanceof File ? image : null,
           },
         ]
