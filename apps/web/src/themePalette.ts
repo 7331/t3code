@@ -77,15 +77,20 @@ type CustomThemeLibrarySnapshot =
   | Readonly<{ status: "unavailable"; reason: "storage-unavailable"; cause: unknown }>;
 
 let customThemeLibrarySnapshot: CustomThemeLibrarySnapshot | null = null;
+type ThemePreview = Readonly<{ colors: ThemeColors; appearance: ThemeAppearance }>;
 const themePreviewListeners = new Set<() => void>();
-let themePreviewAppearance: ThemeAppearance | null = null;
+let themePreview: ThemePreview | null = null;
+
+export function getThemePreview(): ThemePreview | null {
+  return themePreview;
+}
 
 export function getThemePreviewAppearance(): ThemeAppearance | null {
-  return themePreviewAppearance;
+  return themePreview?.appearance ?? null;
 }
 
 export function getThemePreviewSidebarArtwork(): boolean | null {
-  return themePreviewAppearance === null ? null : false;
+  return themePreview === null ? null : false;
 }
 
 export function subscribeToThemePreview(listener: () => void): () => void {
@@ -93,9 +98,9 @@ export function subscribeToThemePreview(listener: () => void): () => void {
   return () => themePreviewListeners.delete(listener);
 }
 
-function setThemePreviewAppearance(appearance: ThemeAppearance | null): void {
-  if (themePreviewAppearance === appearance) return;
-  themePreviewAppearance = appearance;
+function setThemePreview(preview: ThemePreview | null): void {
+  if (themePreview === preview) return;
+  themePreview = preview;
   for (const listener of themePreviewListeners) listener();
 }
 
@@ -1574,7 +1579,8 @@ export function applyThemeColorPreview(colors: ThemeColors, appearance: ThemeApp
     if (isThemeColor(value)) root.style.setProperty(APP_THEME_VARIABLES[role], value);
   }
   applyContextChipVariables(root, colors);
-  setThemePreviewAppearance(appearance);
+  syncBrowserChromeTheme();
+  setThemePreview({ colors, appearance });
 }
 
 export type ThemePaint = Readonly<{
@@ -1623,7 +1629,7 @@ export function applyThemePaint(paint: ThemePaint, appearance: ThemeAppearance):
   const root = document.documentElement;
   if (!root?.style) return;
 
-  setThemePreviewAppearance(null);
+  setThemePreview(null);
   if (paint.themeId === null) delete root.dataset.themeId;
   else root.dataset.themeId = paint.themeId;
   root.classList.toggle("dark", appearance === "dark");
