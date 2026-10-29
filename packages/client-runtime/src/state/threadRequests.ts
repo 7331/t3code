@@ -31,6 +31,15 @@ export async function sendApprovalFeedback(
   return (await respond(approval.requestId, "decline", feedback.trim()))?._tag === "Success";
 }
 
+/** What a reply field says while an approval waits, since sending one declines it. */
+export function pendingApprovalReplyPlaceholder(
+  approval: Pick<ThreadPendingApproval, "supportsFeedback">,
+): string {
+  return approval.supportsFeedback
+    ? "Send feedback to decline this request"
+    : "Send a message to decline and redirect the agent";
+}
+
 /** Declines every approval a redirect replaces; any one still pending would block the agent. */
 export async function declinePendingApprovals(
   approvals: ReadonlyArray<ThreadPendingApproval>,

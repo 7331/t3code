@@ -124,7 +124,7 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
       }
     >
       {parent === null ? (
-        <Empty>
+        <Empty size="compact">
           <EmptyHeader>
             <EmptyTitle>Thread not found</EmptyTitle>
             <EmptyDescription>It may have been archived or deleted.</EmptyDescription>

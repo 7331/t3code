@@ -53,6 +53,7 @@ import {
 } from "@t3tools/shared/codexArtifactTemplates";
 import {
   declinePendingApprovals,
+  pendingApprovalReplyPlaceholder,
   sendApprovalFeedback,
   type ApprovalResponder,
   type ThreadUserInputQuestion,
@@ -1578,9 +1579,7 @@ function ThreadDetailBody(props: ThreadDetailScreenProps) {
                         editorRef={composerEditorRef}
                         placeholder={
                           props.activePendingApproval
-                            ? props.activePendingApproval.supportsFeedback
-                              ? "Send feedback to decline this request"
-                              : "Send a message to decline and redirect the agent"
+                            ? pendingApprovalReplyPlaceholder(props.activePendingApproval)
                             : "Ask anything"
                         }
                         contentMaxWidth={contentMaxWidth}

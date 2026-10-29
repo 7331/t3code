@@ -18,12 +18,13 @@ import {
   ChevronDownIcon,
   CircleCheckIcon,
   CircleDotIcon,
+  EllipsisIcon,
   PinIcon,
   PinOffIcon,
   SquareArrowOutUpRightIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
@@ -47,6 +48,7 @@ import {
 import { TopStatusIcon } from "../sidebar/SidebarThreadRow";
 import { ThreadWorktreeIndicator } from "../ThreadStatusIndicators";
 import { Button } from "../ui/button";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HomeCardComposer } from "./HomeCardComposer";
 import { threadRelationshipStatusLabel } from "../chat/ThreadRelationshipIcon";
@@ -116,12 +118,13 @@ export function HomeThreadCard({
   const cwd = thread.worktreePath ?? project?.workspaceRoot ?? null;
 
   return (
+    // Set apart from the page by tone alone; no border or shadow.
     <section
       aria-label={title}
       data-home-card=""
-      className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card text-card-foreground shadow-xs"
+      className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-card text-card-foreground"
     >
-      <div className={cn("flex items-center gap-3 px-4 py-3", !collapsed && "border-b")}>
+      <div className="flex items-center gap-3 px-5 py-4">
         {project ? <ProjectFavicon project={project} className="size-5 shrink-0" /> : null}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex min-w-0 items-center gap-2">
@@ -153,30 +156,61 @@ export function HomeThreadCard({
             <ThreadWorktreeIndicator thread={thread} />
           </span>
         </div>
-        <div className="flex shrink-0 items-center">
-          {settle ? (
-            <CardIconButton label={settle.active ? "Unsettle" : "Settle"} onClick={settle.toggle}>
-              {settle.active ? <CircleDotIcon /> : <CircleCheckIcon />}
-            </CardIconButton>
-          ) : null}
-          {pin ? (
-            <CardIconButton label={pin.active ? "Unpin" : "Pin to Home"} onClick={pin.toggle}>
-              {pin.active ? <PinOffIcon /> : <PinIcon />}
-            </CardIconButton>
-          ) : null}
-          <CardIconButton
-            label="Open thread"
-            onClick={() => void navigate({ to: "/$environmentId/$threadId", params: routeParams })}
-          >
-            <SquareArrowOutUpRightIcon />
-          </CardIconButton>
-          <CardIconButton
-            label={collapsed ? "Expand" : "Collapse"}
-            ariaExpanded={!collapsed}
-            onClick={onToggleCollapsed}
-          >
-            <ChevronDownIcon className={cn("transition-transform", !collapsed && "rotate-180")} />
-          </CardIconButton>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Menu>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <MenuTrigger
+                    render={
+                      <Button variant="ghost-muted" size="icon-sm" aria-label="More actions" />
+                    }
+                  />
+                }
+              >
+                <EllipsisIcon />
+              </TooltipTrigger>
+              <TooltipPopup side="top">More actions</TooltipPopup>
+            </Tooltip>
+            <MenuPopup align="end">
+              <MenuItem
+                onClick={() =>
+                  void navigate({ to: "/$environmentId/$threadId", params: routeParams })
+                }
+              >
+                <SquareArrowOutUpRightIcon />
+                Open thread
+              </MenuItem>
+              {settle ? (
+                <MenuItem onClick={settle.toggle}>
+                  {settle.active ? <CircleDotIcon /> : <CircleCheckIcon />}
+                  {settle.active ? "Unsettle" : "Settle"}
+                </MenuItem>
+              ) : null}
+              {pin ? (
+                <MenuItem onClick={pin.toggle}>
+                  {pin.active ? <PinOffIcon /> : <PinIcon />}
+                  {pin.active ? "Unpin" : "Pin to Home"}
+                </MenuItem>
+              ) : null}
+            </MenuPopup>
+          </Menu>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost-muted"
+                  size="icon-sm"
+                  aria-label={collapsed ? "Expand" : "Collapse"}
+                  aria-expanded={!collapsed}
+                  onClick={onToggleCollapsed}
+                />
+              }
+            >
+              <ChevronDownIcon className={cn("transition-transform", !collapsed && "rotate-180")} />
+            </TooltipTrigger>
+            <TooltipPopup side="top">{collapsed ? "Expand" : "Collapse"}</TooltipPopup>
+          </Tooltip>
         </div>
       </div>
       <AnimatedHeight>
@@ -246,37 +280,6 @@ function HomeCardAgentEmblem({
   );
 }
 
-function CardIconButton({
-  label,
-  onClick,
-  ariaExpanded,
-  children,
-}: {
-  readonly label: string;
-  readonly onClick: () => void;
-  readonly ariaExpanded?: boolean;
-  readonly children: ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={label}
-            aria-expanded={ariaExpanded}
-            onClick={onClick}
-          />
-        }
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipPopup side="top">{label}</TooltipPopup>
-    </Tooltip>
-  );
-}
-
 /**
  * The latest messages and the agent's work between them, newest against the reply field. The body never scrolls, so the wheel always
  * moves the page; older messages fade out at the top and the thread is one click away.
@@ -294,7 +297,7 @@ function HomeCardTranscript({
   const rows = latestHomeCardRows(useThreadVisibleTurnItems(threadRef));
   if (rows.length === 0) {
     return (
-      <p className="flex min-h-20 items-center justify-center px-4 py-3 text-sm text-muted-foreground">
+      <p className="flex min-h-20 items-center justify-center px-5 pb-4 text-sm text-muted-foreground">
         {projection === null ? "Loading…" : "No messages yet. Send the first one below."}
       </p>
     );
@@ -332,7 +335,7 @@ function HomeCardMessages({
     <div
       ref={bodyRef}
       className={cn(
-        "flex max-h-56 flex-col justify-end overflow-hidden px-4 py-3",
+        "flex max-h-56 flex-col justify-end overflow-hidden px-5 pb-4",
         clipped && "[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]",
       )}
     >
@@ -404,7 +407,7 @@ function HomeCardProviderSubagentFooter({
     0,
   );
   return (
-    <div className="flex items-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
+    <div className="flex items-center gap-2 px-5 pb-4 text-xs text-muted-foreground">
       <HomeCardAgentEmblem providerEntry={providerEntry} />
       <span className="truncate">{statusLabel}</span>
       <span className="ms-auto shrink-0">Run by the provider; reply in the parent</span>
