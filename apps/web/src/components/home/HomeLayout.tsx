@@ -8,7 +8,9 @@ import { ScrollArea } from "../ui/scroll-area";
 import { SidebarInset } from "../ui/sidebar";
 import { WorkspaceBreadcrumb } from "../WorkspaceBreadcrumb";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
-import { homeCardSpansFullWidth } from "./homeThreads.logic";
+import { deriveProviderEntriesByEnvironment } from "../../providerInstances";
+import { useServerConfigs } from "../../state/entities";
+import { useEnvironmentProviders } from "../../state/environments";
 
 const COLLAPSED_CARDS_STORAGE_KEY = "t3code:home:collapsed-threads";
 const CollapsedCardKeys = Schema.Array(Schema.String);
@@ -28,6 +30,18 @@ export function useCollapsedHomeCards() {
         current.includes(key) ? current.filter((entry) => entry !== key) : [...current, key],
       ),
   };
+}
+
+/** Each environment's provider instances by id, as the sidebar resolves them for its logos. */
+export function useHomeProviderEntriesByEnvironment() {
+  const providersByEnvironment = useEnvironmentProviders();
+  const serverConfigs = useServerConfigs();
+  return deriveProviderEntriesByEnvironment(
+    [...serverConfigs].map(
+      ([environmentId, config]) =>
+        [environmentId, providersByEnvironment.get(environmentId) ?? [], config.settings] as const,
+    ),
+  );
 }
 
 /** Home's page frame: the workspace header with a breadcrumb, then a scrolling, centred column. */
@@ -83,7 +97,7 @@ export function HomeCardGrid({
       {cards.map(({ key, card }, index) => (
         <div
           key={key}
-          className={cn("min-w-0", homeCardSpansFullWidth(index, cards.length) && "lg:col-span-2")}
+          className={cn("min-w-0", index === 0 && cards.length % 2 === 1 && "lg:col-span-2")}
         >
           {card}
         </div>

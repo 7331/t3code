@@ -27,7 +27,12 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
-import { useProject, useThreadProjection, useThreadVisibleTurnItems } from "../../state/entities";
+import type { ProviderInstanceEntry } from "../../providerInstances";
+import {
+  useProject,
+  useQuietThreadProjection,
+  useThreadVisibleTurnItems,
+} from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { useUiStateStore } from "~/uiStateStore";
 import { AnimatedHeight } from "../AnimatedHeight";
@@ -39,7 +44,7 @@ import {
   resolveSidebarThreadStatus,
   resolveThreadLastVisitedAt,
 } from "../Sidebar.logic";
-import { SidebarRowStatusIconView } from "../sidebar/SidebarRowStatusIcon";
+import { TopStatusIcon } from "../sidebar/SidebarThreadRow";
 import { ThreadWorktreeIndicator } from "../ThreadStatusIndicators";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -51,7 +56,6 @@ import {
   homeCardSubtitle,
   latestHomeCardRows,
 } from "./homeThreads.logic";
-import { type HomeCardModel, useHomeCardModel } from "./useHomeCardModel";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { subagentStatusTone } from "./subagentBoard.logic";
 
@@ -63,6 +67,7 @@ interface CardToggle {
 /** One thread on Home: its header, its latest messages, and a quick reply into its shared draft. */
 export function HomeThreadCard({
   thread,
+  providerEntry,
   title: titleOverride,
   collapsed,
   onToggleCollapsed,
@@ -73,6 +78,7 @@ export function HomeThreadCard({
   subagentStatus,
 }: {
   readonly thread: EnvironmentThreadShell;
+  readonly providerEntry: ProviderInstanceEntry | null;
   /** Overrides the thread title, e.g. with a subagent's display name. */
   readonly title?: string;
   readonly collapsed: boolean;
@@ -95,7 +101,6 @@ export function HomeThreadCard({
   const localLastVisitedAt = useUiStateStore(
     (state) => state.threadLastVisitedAtById[scopedThreadKey(threadRef)],
   );
-  const model = useHomeCardModel(thread, threadRef);
   // The sidebar row's own wording; snooze wake-ups ("Woke") stay a sidebar affordance.
   const status = resolveSidebarRowStatus({
     status: resolveSidebarThreadStatus(thread),
@@ -136,14 +141,14 @@ export function HomeThreadCard({
                   status.className,
                 )}
               >
-                <SidebarRowStatusIconView icon={status.icon} className="size-3.5" />
+                <TopStatusIcon icon={status.icon} className="size-3.5" />
                 {status.label}
               </span>
             ) : null}
           </div>
           {/* Always one line tall, so cards keep their height when a subtitle part is missing. */}
           <span className="flex h-4 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <HomeCardAgentEmblem model={model} />
+            <HomeCardAgentEmblem providerEntry={providerEntry} />
             <span className="truncate">{subtitle}</span>
             <ThreadWorktreeIndicator thread={thread} />
           </span>
@@ -183,15 +188,9 @@ export function HomeThreadCard({
               running={threadRuntimeIsActive(thread.runtime)}
             />
             {readOnly ? (
-              <HomeCardProviderSubagentFooter threadRef={threadRef} model={model} />
+              <HomeCardProviderSubagentFooter threadRef={threadRef} providerEntry={providerEntry} />
             ) : (
-              <HomeCardComposer
-                thread={thread}
-                threadRef={threadRef}
-                cwd={cwd}
-                hint={replyHint}
-                model={model}
-              />
+              <HomeCardComposer thread={thread} threadRef={threadRef} hint={replyHint} />
             )}
           </>
         )}
@@ -201,9 +200,9 @@ export function HomeThreadCard({
 }
 
 const SUBAGENT_TONES = {
-  active: { icon: "working", className: "text-info" },
-  done: { icon: "done", className: "text-success" },
-  failed: { icon: "failed", className: "text-error" },
+  active: { icon: "working", className: "text-info-foreground" },
+  done: { icon: "done", className: "text-success-foreground" },
+  failed: { icon: "failed", className: "text-error-foreground" },
   muted: { icon: "waiting", className: "text-muted-foreground" },
 } as const;
 
@@ -214,28 +213,31 @@ function SubagentStatusLabel({ status }: { readonly status: string | null }) {
     <span
       className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-medium", tone.className)}
     >
-      <SidebarRowStatusIconView icon={tone.icon} className="size-3.5" />
+      <TopStatusIcon icon={tone.icon} className="size-3.5" />
       {threadRelationshipStatusLabel(status)}
     </span>
   );
 }
 
-/** The agent's logo, as sidebar rows show it; the model it will run on is in the tooltip. */
-function HomeCardAgentEmblem({ model }: { readonly model: HomeCardModel }) {
-  const { entry } = model;
-  if (entry === null) return null;
-  const label = `${entry.displayName} · ${model.label}`;
+/** The agent's logo, as sidebar rows show it. */
+function HomeCardAgentEmblem({
+  providerEntry,
+}: {
+  readonly providerEntry: ProviderInstanceEntry | null;
+}) {
+  if (providerEntry === null) return null;
+  const label = providerEntry.displayName;
   return (
     <Tooltip>
       <TooltipTrigger
         render={<span role="img" aria-label={label} className="inline-flex shrink-0" />}
       >
         <ProviderInstanceIcon
-          driverKind={entry.driverKind}
-          displayName={entry.displayName}
-          accentColor={entry.accentColor}
-          acpRegistryAgentId={entry.acpRegistryAgentId}
-          acpRegistryIconUrl={entry.acpRegistryIconUrl}
+          driverKind={providerEntry.driverKind}
+          displayName={providerEntry.displayName}
+          accentColor={providerEntry.accentColor}
+          acpRegistryAgentId={providerEntry.acpRegistryAgentId}
+          acpRegistryIconUrl={providerEntry.acpRegistryIconUrl}
           size="compact"
         />
       </TooltipTrigger>
@@ -288,7 +290,7 @@ function HomeCardTranscript({
   readonly cwd: string | undefined;
   readonly running: boolean;
 }) {
-  const projection = useThreadProjection(threadRef);
+  const projection = useQuietThreadProjection(threadRef);
   const rows = latestHomeCardRows(useThreadVisibleTurnItems(threadRef));
   if (rows.length === 0) {
     return (
@@ -389,12 +391,12 @@ function HomeCardActivity({
 
 function HomeCardProviderSubagentFooter({
   threadRef,
-  model,
+  providerEntry,
 }: {
   readonly threadRef: ScopedThreadRef;
-  readonly model: HomeCardModel;
+  readonly providerEntry: ProviderInstanceEntry | null;
 }) {
-  const projection = useThreadProjection(threadRef)?.projection ?? null;
+  const projection = useQuietThreadProjection(threadRef)?.projection ?? null;
   const status = projection === null ? null : deriveProviderSubagentStatus(projection);
   // Without a start time the label stays static; a ticking timer per card is not worth the repaints.
   const statusLabel = formatProviderSubagentStatus(
@@ -403,7 +405,7 @@ function HomeCardProviderSubagentFooter({
   );
   return (
     <div className="flex items-center gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
-      <HomeCardAgentEmblem model={model} />
+      <HomeCardAgentEmblem providerEntry={providerEntry} />
       <span className="truncate">{statusLabel}</span>
       <span className="ms-auto shrink-0">Run by the provider; reply in the parent</span>
     </div>

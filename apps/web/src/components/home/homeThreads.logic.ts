@@ -1,9 +1,6 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import {
-  sortPinnedThreadsByOrderKey,
-  sortThreads,
-} from "@t3tools/client-runtime/state/thread-sort";
-import type { OrchestrationV2ProjectedTurnItem, SidebarThreadSortOrder } from "@t3tools/contracts";
+import { sortPinnedThreadsByOrderKey } from "@t3tools/client-runtime/state/thread-sort";
+import type { OrchestrationV2ProjectedTurnItem } from "@t3tools/contracts";
 
 import { liveThoughtLine, summarizeToolGroup } from "@t3tools/client-runtime/work-log/presentation";
 
@@ -13,96 +10,19 @@ import { filterSidebarV2VisibleThreads } from "../Sidebar.logic";
 
 /** Each card holds a live subscription to its thread's detail stream, so Home stays a handful. */
 export const HOME_MAX_CARDS = 6;
-/** The rail's two lists stay short enough to scan without scrolling. */
-const HOME_RAIL_MAX_PER_SECTION = 6;
 /** Home is for glancing across threads, so a card previews only the last few messages. */
 const HOME_CARD_MESSAGE_LIMIT = 3;
 
-type HomeThreadInput = Pick<
-  EnvironmentThreadShell,
-  | "environmentId"
-  | "id"
-  | "projectId"
-  | "archivedAt"
-  | "lineage"
-  | "pinnedAt"
-  | "pinOrderKey"
-  | "createdAt"
-  | "updatedAt"
-  | "latestUserMessageAt"
-  | "visibleItemCount"
->;
-
-export interface HomeThreadSelection<T> {
-  /** "recent" means nothing is pinned, so Home shows each project's latest thread instead. */
-  readonly source: "pinned" | "recent";
-  readonly threads: ReadonlyArray<T>;
-}
-
-/**
- * Pinned threads in the sidebar's pin order, else the latest thread with messages in each project.
- * Opening a project leaves an empty thread behind, and it would otherwise win every recent slot.
- */
-export function selectHomeThreads<T extends HomeThreadInput>(
-  threads: ReadonlyArray<T>,
-  sortOrder: SidebarThreadSortOrder,
+/** Pinned threads in the sidebar's pin order. */
+export function selectHomeThreads(
+  threads: ReadonlyArray<EnvironmentThreadShell>,
   delegatedUnderParent: ReadonlySet<string>,
-): HomeThreadSelection<T> {
+): ReadonlyArray<EnvironmentThreadShell> {
   const visible = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent);
-  const pinned = visible.filter((thread) => thread.pinnedAt !== null);
-  if (pinned.length > 0) {
-    return {
-      source: "pinned",
-      threads: sortPinnedThreadsByOrderKey(pinned).slice(0, HOME_MAX_CARDS),
-    };
-  }
-  const seenProjects = new Set<string>();
-  const recent: T[] = [];
-  for (const thread of sortThreads(visible, sortOrder)) {
-    if (thread.visibleItemCount === 0) continue;
-    const projectKey = `${thread.environmentId}:${thread.projectId}`;
-    if (seenProjects.has(projectKey)) continue;
-    seenProjects.add(projectKey);
-    recent.push(thread);
-    if (recent.length === HOME_MAX_CARDS) break;
-  }
-  return { source: "recent", threads: recent };
-}
-
-export interface HomeRailSelection<T> {
-  readonly pinned: ReadonlyArray<T>;
-  readonly recent: ReadonlyArray<T>;
-}
-
-/**
- * The rail shows both groups at once: pinned threads in the sidebar's pin order,
- * then the latest thread with messages in each project that is not already pinned.
- */
-export function selectHomeRailThreads<T extends HomeThreadInput>(
-  threads: ReadonlyArray<T>,
-  sortOrder: SidebarThreadSortOrder,
-  delegatedUnderParent: ReadonlySet<string>,
-): HomeRailSelection<T> {
-  const visible = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent);
-  const pinned = sortPinnedThreadsByOrderKey(
-    visible.filter((thread) => thread.pinnedAt !== null),
-  ).slice(0, HOME_RAIL_MAX_PER_SECTION);
-  const pinnedKeys = new Set(pinned.map((thread) => `${thread.environmentId}:${thread.id}`));
-  // A project whose freshest thread is pinned has its recent slot filled already.
-  const seenProjects = new Set(
-    pinned.map((thread) => `${thread.environmentId}:${thread.projectId}`),
+  return sortPinnedThreadsByOrderKey(visible.filter((thread) => thread.pinnedAt !== null)).slice(
+    0,
+    HOME_MAX_CARDS,
   );
-  const recent: T[] = [];
-  for (const thread of sortThreads(visible, sortOrder)) {
-    if (thread.visibleItemCount === 0) continue;
-    if (pinnedKeys.has(`${thread.environmentId}:${thread.id}`)) continue;
-    const projectKey = `${thread.environmentId}:${thread.projectId}`;
-    if (seenProjects.has(projectKey)) continue;
-    seenProjects.add(projectKey);
-    recent.push(thread);
-    if (recent.length === HOME_RAIL_MAX_PER_SECTION) break;
-  }
-  return { pinned, recent };
 }
 
 /** A card's transcript line: a message, or one muted line for the agent work between messages. */
@@ -126,10 +46,27 @@ export type HomeCardRow =
  */
 export function latestHomeCardRows(
   items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>,
-  limit: number = HOME_CARD_MESSAGE_LIMIT,
 ): ReadonlyArray<HomeCardRow> {
+  // Derive only the tail from the oldest kept message, so a streamed token doesn't rebuild the
+  // whole history.
+  let tailStart = 0;
+  let tailMessageCount = 0;
+  for (
+    let index = items.length - 1;
+    index >= 0 && tailMessageCount < HOME_CARD_MESSAGE_LIMIT;
+    index -= 1
+  ) {
+    const { item } = items[index]!;
+    if (
+      (item.type === "user_message" || item.type === "assistant_message") &&
+      item.text.trim().length > 0
+    ) {
+      tailStart = index;
+      tailMessageCount += 1;
+    }
+  }
   const entries = deriveTimelineEntriesFromVisibleTurnItems({
-    visibleTurnItems: items,
+    visibleTurnItems: items.slice(tailStart),
     optimisticMessages: [],
   });
   const rows: HomeCardRow[] = [];
@@ -141,7 +78,11 @@ export function latestHomeCardRows(
     work = [];
   };
   let messageCount = 0;
-  for (let index = entries.length - 1; index >= 0 && messageCount < limit; index -= 1) {
+  for (
+    let index = entries.length - 1;
+    index >= 0 && messageCount < HOME_CARD_MESSAGE_LIMIT;
+    index -= 1
+  ) {
     const entry = entries[index]!;
     if (entry.kind === "work") {
       work.push(entry.entry);
@@ -196,14 +137,6 @@ export function homeCardActivityLabel(
     thinking: entries.every((entry) => entry.itemType === "reasoning"),
     failed: hasFailure,
   };
-}
-
-/**
- * Cards pair up in two columns. With an odd count the first card takes a full row, so the rest
- * still pair up and no row is left half empty.
- */
-export function homeCardSpansFullWidth(index: number, count: number): boolean {
-  return index === 0 && count % 2 === 1;
 }
 
 /**

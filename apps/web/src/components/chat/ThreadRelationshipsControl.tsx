@@ -42,7 +42,6 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import { deriveSubagentElapsedMs } from "@t3tools/shared/orchestrationTiming";
-import { selectSubagentBoardChildren } from "../home/subagentBoard.logic";
 import { groupBy } from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import { useNavigate } from "@tanstack/react-router";
@@ -456,13 +455,10 @@ export function ThreadRelationshipsPanel(props: {
       return "related";
     return isSettledSubagentStatus(edge.status) ? "previous" : "active";
   });
-  // The board shows live subagent threads only, so the button waits for one it can show.
-  const board = selectSubagentBoardChildren({
-    graph: deriveThreadRelationshipGraph({ threads: relationshipShells, projection }),
-    parentThreadId: props.threadId,
-    statusOverrides: workflowStatuses,
-  });
-  const hasSubagentChildren = board.total > 0;
+  // The board shows unarchived subagent threads only, so the button waits for one it can show.
+  const hasSubagentChildren = [...active, ...previous].some(
+    ({ threadId }) => graph.nodes.get(threadId)?.thread?.archivedAt === null,
+  );
   const groups = [
     { id: "related", label: null, rows: related, expanded: true },
     { id: "active", label: null, rows: active, expanded: true },

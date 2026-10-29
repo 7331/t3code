@@ -15,7 +15,6 @@ import {
   pinOrderKeyBetween,
   resolveProjectStatusIndicator,
   resolveSidebarSweepKeys,
-  resolveSidebarRowStatus,
   resolveSidebarThreadStatus,
   resolveThreadStatusPill,
   resolveWorkingStartedAt,
@@ -1266,27 +1265,6 @@ describe("Working shelf (beta)", () => {
         unsnooze: false,
       });
     });
-  });
-});
-
-describe("resolveSidebarRowStatus", () => {
-  const base = { goalActive: false, isWoke: false, isUnread: false };
-
-  it("says Done for an unseen completion, the word Home cards reuse", () => {
-    expect(resolveSidebarRowStatus({ ...base, status: "ready", isUnread: true })?.label).toBe(
-      "Done",
-    );
-    expect(resolveSidebarRowStatus({ ...base, status: "ready" })).toBeNull();
-  });
-
-  it("names live and blocked states", () => {
-    expect(resolveSidebarRowStatus({ ...base, status: "working" })?.label).toBe("Working");
-    expect(resolveSidebarRowStatus({ ...base, status: "working", goalActive: true })?.label).toBe(
-      "Goal",
-    );
-    expect(resolveSidebarRowStatus({ ...base, status: "approval" })?.label).toBe("Approval");
-    expect(resolveSidebarRowStatus({ ...base, status: "limited" })?.icon).toBe("failed");
-    expect(resolveSidebarRowStatus({ ...base, status: "ready", isWoke: true })?.label).toBe("Woke");
   });
 });
 

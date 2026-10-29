@@ -6,7 +6,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import {
-  useThreadProjection,
+  useQuietThreadProjection,
   useThreadRelationshipShells,
   useQuietThreadShells,
 } from "../../state/entities";
@@ -18,6 +18,7 @@ import {
   HomePageShell,
   HomeSectionHeading,
   useCollapsedHomeCards,
+  useHomeProviderEntriesByEnvironment,
 } from "./HomeLayout";
 import { HomeThreadCard } from "./HomeThreadCard";
 import { selectSubagentBoardChildren, subagentCardTitle } from "./subagentBoard.logic";
@@ -25,12 +26,13 @@ import { useHomeCardActions } from "./useHomeCardActions";
 
 /** One thread and its subagents as cards, so a fan-out can be watched and steered in one place. */
 export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThreadRef }) {
-  const projection = useThreadProjection(parentRef)?.projection ?? null;
+  const projection = useQuietThreadProjection(parentRef)?.projection ?? null;
   const relationshipShells = useThreadRelationshipShells(parentRef);
   // Quiet shells hold still through streaming ticks; cards read live output from their own atoms.
   const threads = useQuietThreadShells();
   const collapsed = useCollapsedHomeCards();
   const cardActions = useHomeCardActions();
+  const providerEntries = useHomeProviderEntriesByEnvironment().get(parentRef.environmentId);
 
   const shellsById = new Map(
     threads
@@ -71,6 +73,7 @@ export function SubagentBoardPage({ parentRef }: { readonly parentRef: ScopedThr
       card: (
         <HomeThreadCard
           thread={thread}
+          providerEntry={providerEntries?.get(thread.modelSelection.instanceId) ?? null}
           title={
             role === "parent"
               ? thread.title

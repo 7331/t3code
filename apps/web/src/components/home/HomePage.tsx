@@ -1,6 +1,5 @@
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 
-import { useClientSettings } from "../../hooks/useSettings";
 import {
   useAllEnvironmentShellsBootstrapped,
   useDelegatedUnderParent,
@@ -15,8 +14,8 @@ import {
   HomePageShell,
   HomeSectionHeading,
   useCollapsedHomeCards,
+  useHomeProviderEntriesByEnvironment,
 } from "./HomeLayout";
-import { HomeRail } from "./HomeRail";
 import { HomeThreadCard } from "./HomeThreadCard";
 import { selectHomeThreads } from "./homeThreads.logic";
 import { useHomeCardActions } from "./useHomeCardActions";
@@ -27,14 +26,14 @@ export function HomePage() {
   const threads = useQuietThreadShells();
   const projects = useProjects();
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
-  const sortOrder = useClientSettings((settings) => settings.sidebarThreadSortOrder);
   const delegatedUnderParent = useDelegatedUnderParent();
   const cardActions = useHomeCardActions();
   const collapsed = useCollapsedHomeCards();
+  const providerEntriesByEnvironment = useHomeProviderEntriesByEnvironment();
 
   if (bootstrapped && projects.length === 0) return <NoProjectsHero />;
 
-  const selection = selectHomeThreads(threads, sortOrder, delegatedUnderParent);
+  const pinnedThreads = selectHomeThreads(threads, delegatedUnderParent);
 
   return (
     <HomePageShell
@@ -45,57 +44,43 @@ export function HomePage() {
         </WorkspaceBreadcrumbItem>
       }
     >
-      <div className="flex min-h-0 items-start gap-6">
-        <HomeRail
-          threads={threads}
-          sortOrder={sortOrder}
-          delegatedUnderParent={delegatedUnderParent}
-          className="sticky top-0"
-        />
-        <div className="min-w-0 flex-1">
-          {selection.threads.length === 0 ? (
-            bootstrapped ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyTitle>No threads yet</EmptyTitle>
-                  <EmptyDescription>
-                    Start a thread in any project and it shows up here.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : null
-          ) : (
-            <>
-              <HomeSectionHeading
-                title={selection.source === "pinned" ? "Pinned threads" : "Recent threads"}
-                description={
-                  selection.source === "recent"
-                    ? "Nothing is pinned, so this shows the latest thread with messages in each project. Pin threads to choose what stays here."
-                    : null
-                }
-              />
-              <HomeCardGrid
-                cards={selection.threads.map((thread) => {
-                  const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-                  const actions = cardActions(thread);
-                  return {
-                    key,
-                    card: (
-                      <HomeThreadCard
-                        thread={thread}
-                        collapsed={collapsed.isCollapsed(key)}
-                        onToggleCollapsed={() => collapsed.toggle(key)}
-                        pin={actions.pin}
-                        settle={actions.settle}
-                      />
-                    ),
-                  };
-                })}
-              />
-            </>
-          )}
-        </div>
-      </div>
+      {pinnedThreads.length === 0 ? (
+        bootstrapped ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No pinned threads</EmptyTitle>
+              <EmptyDescription>Pin threads in the sidebar to follow them here.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : null
+      ) : (
+        <>
+          <HomeSectionHeading title="Pinned threads" />
+          <HomeCardGrid
+            cards={pinnedThreads.map((thread) => {
+              const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+              const actions = cardActions(thread);
+              return {
+                key,
+                card: (
+                  <HomeThreadCard
+                    thread={thread}
+                    providerEntry={
+                      providerEntriesByEnvironment
+                        .get(thread.environmentId)
+                        ?.get(thread.modelSelection.instanceId) ?? null
+                    }
+                    collapsed={collapsed.isCollapsed(key)}
+                    onToggleCollapsed={() => collapsed.toggle(key)}
+                    pin={actions.pin}
+                    settle={actions.settle}
+                  />
+                ),
+              };
+            })}
+          />
+        </>
+      )}
     </HomePageShell>
   );
 }

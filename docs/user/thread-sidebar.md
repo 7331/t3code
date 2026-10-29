@@ -149,13 +149,13 @@ cannot drag or move threads within it. Your saved order returns when you turn it
 
 On web and desktop, **Home** shows your pinned threads as cards, so you can follow several
 projects without switching threads. Open it from the **T3 Code** wordmark at the top of the
-sidebar, or with **Open home** in the command palette. With nothing pinned, Home shows the latest
-thread that has messages in each project.
+sidebar, or with **Open home** in the command palette. Pin a thread to add it to Home.
 
-Each card shows the thread's last few messages and a reply field with its own model picker.
-Replies use the thread's draft, so text you start on a card is waiting when you open the thread,
-and a reply to a running thread follows your follow-up setting. Attachments and context still go
-through the thread's own composer. Collapsing a card is remembered on this device.
+Each card shows the thread's last few messages and a plain text reply field. Replies use the
+thread's draft and model, so text you start on a card is waiting when you open the thread, and a
+reply to a running thread follows your follow-up setting. Mentions, skills, slash commands, the
+model picker, attachments and context stay in the thread's own composer. Collapsing a card is
+remembered on this device.
 
 To see a thread's subagents side by side, open the thread's details and choose **Subagents** under
 **Lineage**. You can reply to subagents that T3 Code started. Subagents a provider runs itself are

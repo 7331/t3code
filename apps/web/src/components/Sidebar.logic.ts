@@ -811,48 +811,69 @@ export type SidebarThreadStatus =
   | "limited"
   | "ready";
 
-export type SidebarRowStatusIcon =
-  | "working"
-  | "waiting"
-  | "approval"
-  | "input"
-  | "request"
-  | "failed"
-  | "woke"
-  | "done";
-
-export interface SidebarRowStatus {
-  readonly label: string;
-  readonly icon: SidebarRowStatusIcon;
-  readonly className: string;
-}
-
-const SIDEBAR_ROW_STATUS_PRESENTATION = {
-  working: { label: "Working", icon: "working", className: "text-info" },
-  waiting: { label: "Waiting", icon: "waiting", className: "text-muted-foreground" },
-  approval: { label: "Approval", icon: "approval", className: "text-warning-foreground" },
-  input: { label: "Input", icon: "input", className: "text-indigo-600 dark:text-indigo-300" },
-  limited: { label: "Limited", icon: "failed", className: "text-warning-foreground" },
-  request: { label: "Request", icon: "request", className: "text-guest-foreground" },
-  failed: { label: "Failed", icon: "failed", className: "text-error" },
-  woke: { label: "Woke", icon: "woke", className: "text-warning" },
-  done: { label: "Done", icon: "done", className: "text-success" },
-} as const satisfies Record<SidebarV2TopStatusKind, SidebarRowStatus>;
-
-/**
- * The word, glyph and tone a thread row leads with, for the status `resolveSidebarV2TopStatus`
- * picks. Home cards draw the same, so the two never disagree.
- */
+/** The word, glyph and tone a thread row leads with; Home's cards show the same. */
 export function resolveSidebarRowStatus(input: {
   readonly status: SidebarThreadStatus;
   readonly goalActive: boolean;
   readonly isWoke: boolean;
   readonly isUnread: boolean;
-}): SidebarRowStatus | null {
-  const kind = resolveSidebarV2TopStatus(input);
-  if (kind === null) return null;
-  const presentation = SIDEBAR_ROW_STATUS_PRESENTATION[kind];
-  return kind === "working" && input.goalActive ? { ...presentation, label: "Goal" } : presentation;
+}) {
+  const { status, isWoke, isUnread } = input;
+  return status === "working"
+    ? {
+        label: input.goalActive ? "Goal" : "Working",
+        icon: "working" as const,
+        className: "text-info-foreground",
+      }
+    : status === "waiting"
+      ? {
+          label: "Waiting",
+          icon: "waiting" as const,
+          className: "text-muted-foreground",
+        }
+      : status === "approval"
+        ? {
+            label: "Approval",
+            icon: "approval" as const,
+            className: "text-warning-foreground",
+          }
+        : status === "input"
+          ? {
+              label: "Input",
+              icon: "input" as const,
+              className: "text-indigo-600 dark:text-indigo-300",
+            }
+          : status === "request"
+            ? {
+                label: "Request",
+                icon: "request" as const,
+                className: "text-guest-foreground",
+              }
+            : status === "limited"
+              ? {
+                  label: "Limited",
+                  icon: "failed" as const,
+                  className: "text-warning-foreground",
+                }
+              : status === "failed"
+                ? {
+                    label: "Failed",
+                    icon: "failed" as const,
+                    className: "text-error-foreground",
+                  }
+                : isWoke
+                  ? {
+                      label: "Woke",
+                      icon: "woke" as const,
+                      className: "text-warning-foreground",
+                    }
+                  : isUnread
+                    ? {
+                        label: "Done",
+                        icon: "done" as const,
+                        className: "text-success-foreground",
+                      }
+                    : null;
 }
 
 export function shouldRecedeSidebarThread(input: {
@@ -1002,35 +1023,6 @@ export type SidebarV2TopStatusKind =
   | "waiting"
   | "woke"
   | "working";
-
-function resolveSidebarV2TopStatus(input: {
-  readonly status: SidebarThreadStatus;
-  readonly isUnread: boolean;
-  readonly isWoke: boolean;
-}): SidebarV2TopStatusKind | null {
-  if (input.status === "working") {
-    return "working";
-  }
-  if (input.status === "waiting") {
-    return "waiting";
-  }
-  if (input.status === "approval") {
-    return "approval";
-  }
-  if (input.status === "input") {
-    return "input";
-  }
-  if (input.status === "request") {
-    return "request";
-  }
-  if (input.status === "failed" || input.status === "limited") {
-    return input.status;
-  }
-  if (input.isWoke) {
-    return "woke";
-  }
-  return input.isUnread ? "done" : null;
-}
 
 export function firstValidTimestampMs(
   ...candidates: ReadonlyArray<string | null | undefined>
