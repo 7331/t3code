@@ -19,7 +19,16 @@ import {
 } from "./SnapShotAttachmentDetails";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ZoomableImage, type ZoomableImageHandle } from "./ZoomableImage";
-import { ImageAnnotationEditor } from "./ImageAnnotationEditor";
+import { ImageAnnotationEditor, type ImageAnnotationEditorHandle } from "./ImageAnnotationEditor";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { composerFloatingLayerProps } from "./composerEventScope";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
@@ -79,7 +88,9 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [accessibilityDetailsSrc, setAccessibilityDetailsSrc] = useState<string | null>(null);
   const [editingSrc, setEditingSrc] = useState<string | null>(null);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const zoomableImageRef = useRef<ZoomableImageHandle>(null);
+  const imageAnnotationEditorRef = useRef<ImageAnnotationEditorHandle>(null);
   const [returnFocusTarget] = useState(() =>
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
@@ -116,6 +127,10 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   };
 
   const editing = editingSrc !== null && editingSrc === item?.src;
+  const leaveEditor = () => {
+    if (imageAnnotationEditorRef.current?.hasUnsavedChanges()) setConfirmingDiscard(true);
+    else setEditingSrc(null);
+  };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.defaultPrevented || isContextMenuOpen() || event.target instanceof HTMLVideoElement)
@@ -170,6 +185,12 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           eventDetails.cancel();
           return;
         }
+        // While editing, Escape steps back to the viewer and stray clicks never drop the edits.
+        if (editing) {
+          eventDetails.cancel();
+          if (eventDetails.reason === "escape-key") leaveEditor();
+          return;
+        }
         close();
       }}
     >
@@ -183,22 +204,24 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         initialFocus={closeButtonRef}
         finalFocus={() => returnFocusTarget}
         onClick={(event) => {
-          if (event.target === event.currentTarget) close();
+          if (event.target === event.currentTarget && !editing) close();
         }}
       >
         <DialogTitle className="sr-only">Expanded {mediaLabel} preview</DialogTitle>
-        <Button
-          type="button"
-          ref={closeButtonRef}
-          size="icon-sm"
-          variant="media-close"
-          className="absolute right-0 top-0 z-20"
-          onClick={close}
-          aria-label={`Close ${mediaLabel} preview`}
-        >
-          <XIcon />
-        </Button>
-        {preview.images.length > 1 && (
+        {editing ? null : (
+          <Button
+            type="button"
+            ref={closeButtonRef}
+            size="icon-sm"
+            variant="media-close"
+            className="absolute right-0 top-0 z-20"
+            onClick={close}
+            aria-label={`Close ${mediaLabel} preview`}
+          >
+            <XIcon />
+          </Button>
+        )}
+        {preview.images.length > 1 && !editing && (
           <Button
             type="button"
             size="icon"
@@ -223,10 +246,10 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
               ) : null
             ) : editing && canEditImage && item.src !== null ? (
               <ImageAnnotationEditor
+                ref={imageAnnotationEditorRef}
                 key={item.src}
                 src={item.src}
                 name={item.name}
-                onCancel={() => setEditingSrc(null)}
                 onApply={(file) => {
                   onApplyImageEdit?.(item, file);
                   close();
@@ -256,7 +279,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                 {item.name}
                 {preview.images.length > 1 ? ` (${index + 1}/${preview.images.length})` : ""}
               </span>
-              {accessibilityDetails && item.source ? (
+              {editing ? null : accessibilityDetails && item.source ? (
                 <Tooltip>
                   <TooltipTrigger
                     render={
@@ -282,7 +305,20 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
               ) : item.source ? (
                 <SnapShotContentsButton source={item.source} side="top" />
               ) : null}
-              {canEditImage && !editing ? (
+              {editing ? (
+                <>
+                  <Button onClick={leaveEditor} size="micro" variant="overlay">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => imageAnnotationEditorRef.current?.save()}
+                    size="micro"
+                    variant="default"
+                  >
+                    Save
+                  </Button>
+                </>
+              ) : canEditImage ? (
                 <Button onClick={() => setEditingSrc(item.src)} size="micro" variant="overlay">
                   Edit
                 </Button>
@@ -290,7 +326,31 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             </div>
           </div>
         </MediaActions>
-        {preview.images.length > 1 && (
+        <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
+          <AlertDialogPopup>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard your changes?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your markup on this image will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogClose render={<Button variant="outline" />}>
+                Keep editing
+              </AlertDialogClose>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setConfirmingDiscard(false);
+                  setEditingSrc(null);
+                }}
+              >
+                Discard
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogPopup>
+        </AlertDialog>
+        {preview.images.length > 1 && !editing && (
           <Button
             type="button"
             size="icon"
