@@ -20,15 +20,6 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ZoomableImage, type ZoomableImageHandle } from "./ZoomableImage";
 import { ImageAnnotationEditor, type ImageAnnotationEditorHandle } from "./ImageAnnotationEditor";
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "../ui/alert-dialog";
 import { composerFloatingLayerProps } from "./composerEventScope";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
@@ -305,7 +296,28 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
               ) : item.source ? (
                 <SnapShotContentsButton source={item.source} side="top" />
               ) : null}
-              {editing ? (
+              {editing && confirmingDiscard ? (
+                <>
+                  <span role="alert">Discard your markup?</span>
+                  <Button
+                    onClick={() => setConfirmingDiscard(false)}
+                    size="micro"
+                    variant="overlay"
+                  >
+                    Keep editing
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setConfirmingDiscard(false);
+                      setEditingSrc(null);
+                    }}
+                    size="micro"
+                    variant="destructive"
+                  >
+                    Discard
+                  </Button>
+                </>
+              ) : editing ? (
                 <>
                   <Button onClick={leaveEditor} size="micro" variant="overlay">
                     Cancel
@@ -326,30 +338,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             </div>
           </div>
         </MediaActions>
-        <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
-          <AlertDialogPopup>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Discard your changes?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Your markup on this image will be lost.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogClose render={<Button variant="outline" />}>
-                Keep editing
-              </AlertDialogClose>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  setConfirmingDiscard(false);
-                  setEditingSrc(null);
-                }}
-              >
-                Discard
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogPopup>
-        </AlertDialog>
         {preview.images.length > 1 && !editing && (
           <Button
             type="button"
