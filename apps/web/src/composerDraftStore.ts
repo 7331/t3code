@@ -540,6 +540,8 @@ interface ComposerDraftStoreState {
     options?: { allowDuplicates?: boolean },
   ) => string[];
   removeImage: (threadRef: ComposerThreadTarget, imageId: string) => void;
+  /** Replaces an image in place under the same id, keeping prompt references to it alive. */
+  replaceImage: (threadRef: ComposerThreadTarget, image: ComposerImageAttachment) => void;
   /** Returns the ids of files appended; a re-pick that replaces a marker is not listed. */
   addFiles: (
     threadRef: ComposerThreadTarget,
@@ -3253,6 +3255,43 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               nextDraftsByThreadKey[threadKey] = nextDraft;
             }
             return { draftsByThreadKey: nextDraftsByThreadKey };
+          });
+        },
+        replaceImage: (threadRef, image) => {
+          const threadKey = resolveComposerDraftKey(get(), threadRef) ?? "";
+          if (threadKey.length === 0) {
+            return;
+          }
+          const existing = get().draftsByThreadKey[threadKey];
+          const replacedImage = existing?.images.find((candidate) => candidate.id === image.id);
+          if (!replacedImage) {
+            return;
+          }
+          if (replacedImage.previewUrl !== image.previewUrl) {
+            revokeObjectPreviewUrl(replacedImage.previewUrl);
+          }
+          set((state) => {
+            const current = state.draftsByThreadKey[threadKey];
+            if (!current?.images.some((candidate) => candidate.id === image.id)) {
+              return state;
+            }
+            const nextDraft: ComposerThreadDraftState = {
+              ...current,
+              images: current.images.map((candidate) =>
+                candidate.id === image.id ? image : candidate,
+              ),
+              // The persisted copy still holds the pre-edit bytes. Dropping it returns the
+              // image to non-persisted until the composer's persistence effect re-stages it.
+              persistedAttachments: current.persistedAttachments.filter(
+                (attachment) => attachment.id !== image.id,
+              ),
+              nonPersistedImageIds: current.nonPersistedImageIds.includes(image.id)
+                ? current.nonPersistedImageIds
+                : [...current.nonPersistedImageIds, image.id],
+            };
+            return {
+              draftsByThreadKey: { ...state.draftsByThreadKey, [threadKey]: nextDraft },
+            };
           });
         },
         addFiles: (threadRef, files, options) => {

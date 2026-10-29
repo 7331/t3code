@@ -1,6 +1,6 @@
 import type { SnapShotSource } from "@t3tools/contracts";
 
-import type { ComposerFileAttachment } from "../../composerDraftStore";
+import type { ComposerFileAttachment, ComposerImageAttachment } from "../../composerDraftStore";
 import { type ChatFileAttachment, type ChatImageAttachment, isVideoAttachment } from "../../types";
 import type {
   AssetCreateUrlResult,
@@ -31,6 +31,8 @@ export interface ExpandedImageItem {
   originalUrl?: string;
   srcFragment?: string;
   actionsSource?: MediaActionSource;
+  /** The composer's pending image behind this preview, present only before it is sent. */
+  composerImage?: ComposerImageAttachment;
 }
 
 export interface ExpandedImagePreview {
@@ -160,7 +162,7 @@ export function attachVideoThumbnail(video: HTMLVideoElement, file: File): () =>
 }
 
 export function buildExpandedImagePreview(
-  images: ReadonlyArray<ChatImageAttachment | ComposerFileAttachment>,
+  images: ReadonlyArray<ChatImageAttachment | ComposerFileAttachment | ComposerImageAttachment>,
   selectedImageId: string,
 ): ExpandedImagePreview | null {
   const selected = images.find((image) => image.id === selectedImageId);
@@ -186,6 +188,9 @@ export function buildExpandedImagePreview(
             name: image.name,
             mimeType: image.mimeType,
             source: image.source,
+            // Only the composer's own pending images carry their draft record, which
+            // marks the preview as editable in place.
+            composerImage: "file" in image && image.file instanceof File ? image : null,
           },
         ]
       : [],
@@ -203,6 +208,7 @@ export function buildExpandedImagePreview(
       name: image.name,
       mimeType: image.mimeType,
       ...(image.source?.kind === "snap-shot" ? { source: image.source } : {}),
+      ...(image.composerImage ? { composerImage: image.composerImage } : {}),
     })),
     index: selectedIndex,
   };

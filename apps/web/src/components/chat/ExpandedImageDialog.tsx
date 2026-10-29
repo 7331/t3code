@@ -19,6 +19,7 @@ import {
 } from "./SnapShotAttachmentDetails";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ZoomableImage, type ZoomableImageHandle } from "./ZoomableImage";
+import { ImageAnnotationEditor } from "./ImageAnnotationEditor";
 import { composerFloatingLayerProps } from "./composerEventScope";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
@@ -29,6 +30,8 @@ import { registerThreadOverlay } from "./threadOverlayRetention";
 interface ExpandedImageDialogProps {
   preview: ExpandedImagePreview;
   onClose: () => void;
+  /** Present when image edits can be applied; missing leaves the viewer read-only. */
+  onApplyImageEdit?: ((item: ExpandedImageItem, file: File) => void) | undefined;
 }
 
 const EXPANDED_MEDIA_STATE_CLASS_NAME =
@@ -70,10 +73,18 @@ function ExpandedVideo({ item }: { readonly item: ExpandedImageItem }) {
 export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   preview,
   onClose,
+  onApplyImageEdit,
 }: ExpandedImageDialogProps) {
   const [imageOffset, setImageOffset] = useState(0);
   const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [accessibilityDetailsSrc, setAccessibilityDetailsSrc] = useState<string | null>(null);
+  // Opening an image lands directly in the editor; only non-editable media
+  // (videos, failed loads) shows the plain viewer instead.
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(() =>
+    preview.images[preview.index]?.type === "video" || preview.images[preview.index]?.src === null
+      ? null
+      : preview.index,
+  );
   const zoomableImageRef = useRef<ZoomableImageHandle>(null);
   const [returnFocusTarget] = useState(() =>
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
@@ -110,9 +121,17 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
     setImageOffset((current) => current + direction);
   };
 
+  // Editing is keyed to the gallery index, so navigating away leaves edit mode
+  // instead of carrying an in-progress edit onto another image.
+  const editing = editingImageIndex === index;
+  const setEditing = (next: boolean) => {
+    setEditingImageIndex(next ? index : null);
+  };
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.defaultPrevented || isContextMenuOpen() || event.target instanceof HTMLVideoElement)
       return;
+    if (editing) return;
     if (zoomableImageRef.current?.pan(event.key)) {
       event.preventDefault();
       event.stopPropagation();
@@ -145,6 +164,12 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
     : accessibilityDetails?.format === "json"
       ? "Show accessibility JSON"
       : "Show extracted text";
+  const canEditImage =
+    onApplyImageEdit !== undefined &&
+    item.type !== "video" &&
+    item.src !== null &&
+    failedImageSrc !== item.src &&
+    !showingAccessibilityDetails;
 
   return (
     <Dialog
@@ -207,6 +232,17 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                   className="h-[min(var(--media-height),40rem)] w-[min(var(--media-width),42rem)] transition-opacity duration-140 ease-out starting:opacity-0 rounded-lg border border-border/70 bg-background p-4 text-xs leading-5 shadow-2xl motion-reduce:transition-none"
                 />
               ) : null
+            ) : editing && canEditImage && item.src !== null ? (
+              <ImageAnnotationEditor
+                key={`${index}:${item.src}`}
+                src={item.src}
+                name={item.name}
+                onCancel={() => setEditing(false)}
+                onApply={(file) => {
+                  onApplyImageEdit?.(item, file);
+                  onClose();
+                }}
+              />
             ) : item.src === null || failedImageSrc === item.src ? (
               <ExpandedMediaFailure>
                 <p>
@@ -314,7 +350,13 @@ registerThreadOverlay((threadKey) => {
   if (current !== null && current.threadKey !== threadKey) closeExpandedImagePreview();
 });
 
-export function ExpandedImageDialogHost({ threadKey }: { readonly threadKey: string }) {
+export function ExpandedImageDialogHost({
+  threadKey,
+  onApplyImageEdit,
+}: {
+  readonly threadKey: string;
+  readonly onApplyImageEdit?: ((item: ExpandedImageItem, file: File) => void) | undefined;
+}) {
   const state = useAtomValue(expandedImagePreviewAtom);
   const preview = state?.threadKey === threadKey ? state.preview : null;
   if (preview === null) return null;
@@ -323,6 +365,7 @@ export function ExpandedImageDialogHost({ threadKey }: { readonly threadKey: str
       key={expandedImageKey(preview)}
       preview={preview}
       onClose={closeExpandedImagePreview}
+      onApplyImageEdit={onApplyImageEdit}
     />
   );
 }
