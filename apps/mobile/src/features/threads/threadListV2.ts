@@ -424,8 +424,19 @@ export interface ThreadListV2SettledShelfListItem {
   readonly disabled: boolean;
 }
 
+/** Heads one project's rows when the list is grouped by project. */
+export interface ThreadListV2ProjectListItem {
+  readonly type: "v2-project";
+  readonly key: string;
+  /** The project of the group's first row; titles and favicons resolve from it. */
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId;
+  readonly count: number;
+}
+
 export type ThreadListV2ListItem =
   | ThreadListV2ThreadListItem
+  | ThreadListV2ProjectListItem
   | ThreadListV2PendingListItem
   | ThreadListV2WorkingShelfListItem
   | ThreadListV2SnoozedShelfListItem
@@ -436,6 +447,7 @@ export function isThreadListV2ListItem(value: {
 }): value is ThreadListV2ListItem {
   return (
     value.type === "v2-thread" ||
+    value.type === "v2-project" ||
     value.type === "v2-pending" ||
     value.type === "v2-working-shelf" ||
     value.type === "v2-snoozed-shelf" ||
@@ -465,6 +477,14 @@ export function threadListV2ListItemsAreEqual(
         previous.hasQueuedMessages === item.hasQueuedMessages &&
         previous.canMoveUp === item.canMoveUp &&
         previous.canMoveDown === item.canMoveDown
+      );
+    case "v2-project":
+      return (
+        previous.type === "v2-project" &&
+        previous.key === item.key &&
+        previous.environmentId === item.environmentId &&
+        previous.projectId === item.projectId &&
+        previous.count === item.count
       );
     case "v2-pending":
       return (
@@ -625,6 +645,59 @@ export function buildThreadListV2ListItems(input: {
       ? entry
       : { ...entry, showTrailingDivider };
   });
+}
+
+/**
+ * Groups the list by project: each run of thread rows (above the shelves and inside each shelf)
+ * splits into one group per project, in the order of each project's first row, under a project
+ * header. Grouping reorders rows, so manual moves are off while it is on.
+ */
+export function groupThreadListV2ItemsByProject(
+  items: ReadonlyArray<ThreadListV2ListItem>,
+  projectGroupKeyOf: (thread: EnvironmentThreadShell) => string,
+): ThreadListV2ListItem[] {
+  const result: ThreadListV2ListItem[] = [];
+  let region = "top";
+  let run: ThreadListV2ThreadListItem[] = [];
+  const flushRun = () => {
+    const groups = new Map<string, ThreadListV2ThreadListItem[]>();
+    for (const entry of run) {
+      const key = projectGroupKeyOf(entry.item.thread);
+      const group = groups.get(key);
+      if (group === undefined) groups.set(key, [entry]);
+      else group.push(entry);
+    }
+    for (const [key, group] of groups) {
+      const first = group[0]!.item.thread;
+      result.push({
+        type: "v2-project",
+        key: `v2-project:${region}:${key}`,
+        environmentId: first.environmentId,
+        projectId: first.projectId,
+        count: group.length,
+      });
+      group.forEach((entry, index) => {
+        const showTrailingDivider = index < group.length - 1;
+        result.push(
+          entry.canMoveUp || entry.canMoveDown || entry.showTrailingDivider !== showTrailingDivider
+            ? { ...entry, canMoveUp: false, canMoveDown: false, showTrailingDivider }
+            : entry,
+        );
+      });
+    }
+    run = [];
+  };
+  for (const entry of items) {
+    if (entry.type === "v2-thread") {
+      run.push(entry);
+      continue;
+    }
+    flushRun();
+    if (entry.type !== "v2-pending") region = entry.type;
+    result.push(entry);
+  }
+  flushRun();
+  return result;
 }
 
 // Immutable shells and field-only sorting make element-identical inputs produce identical output.

@@ -7,6 +7,7 @@ import type { SFSymbol } from "expo-symbols";
 import IconGitPullRequest from "@tabler/icons-react-native/IconGitPullRequest";
 import IconFileDiff from "@tabler/icons-react-native/IconFileDiff";
 import IconRobot from "@tabler/icons-react-native/IconRobot";
+import IconCopy from "@tabler/icons-react-native/IconCopy";
 import { SymbolView as ExpoSymbolView } from "expo-symbols";
 import { withUniwind } from "uniwind";
 import type { AppSymbolViewProps } from "./AppSymbol.android";
@@ -24,6 +25,8 @@ const CUSTOM_ICONS = {
   "git.pull-request.draft": IconGitPullRequestDraft,
   "git.commit": IconGitCommit,
   robot: IconRobot,
+  // Copy sits beside the git glyphs in message rows, so it shares their outline family.
+  "doc.on.doc": IconCopy,
 };
 
 function AppSymbolView(props: AppSymbolViewProps) {

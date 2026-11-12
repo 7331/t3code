@@ -1,3 +1,4 @@
+import { ListSection } from "../../components/ui/ListSection";
 import { ListRow } from "../../components/ui/ListRow";
 import * as Dialog from "../../components/ui/Dialog";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -373,12 +374,14 @@ function T3ConnectSection() {
           showHeader={false}
         />
       ) : (
-        <ListRow
-          label="Sign in to T3 Connect"
-          description="Reach your machines from anywhere, no network setup."
-          disabled={!isLoaded}
-          onPress={() => navigation.navigate("SettingsAuth")}
-        />
+        <ListSection>
+          <ListRow
+            label="Sign in to T3 Connect"
+            description="Reach your machines from anywhere, no network setup."
+            disabled={!isLoaded}
+            onPress={() => navigation.navigate("SettingsAuth")}
+          />
+        </ListSection>
       )}
     </View>
   );

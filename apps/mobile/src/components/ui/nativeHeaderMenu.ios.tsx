@@ -1,40 +1,24 @@
+import { portalActionSheet } from "../../features/portal/sheet/portalActionSheet";
+import { sheetEntriesFromAppBarMenuItems } from "../../features/portal/sheet/portalSheetEntries";
 import { Toolbar } from "./Toolbar";
 
-import type { AppBarMenu, AppBarMenuItem } from "./AppBar.types";
+import type { AppBarMenu } from "./AppBar.types";
 
-function renderMenuItems(items: ReadonlyArray<AppBarMenuItem>) {
-  return items.map((item) =>
-    "items" in item ? (
-      <Toolbar.Menu key={item.id} title={item.title} icon={item.icon} inline={item.inline}>
-        {renderMenuItems(item.items)}
-      </Toolbar.Menu>
-    ) : (
-      <Toolbar.MenuAction
-        key={item.id}
-        icon={item.icon}
-        subtitle={item.subtitle}
-        disabled={item.disabled}
-        destructive={item.destructive}
-        isOn={item.selected}
-        onPress={item.onPress}
-      >
-        {item.title}
-      </Toolbar.MenuAction>
-    ),
-  );
-}
-
+/** A header menu is a bare glyph that raises a Portal action sheet, not a UIKit popover. */
 export function createNativeHeaderMenu(menu: AppBarMenu) {
   return (
-    <Toolbar.Menu
+    <Toolbar.Button
       key={menu.title}
-      title={menu.title}
-      accessibilityLabel={menu.title}
+      accessibilityLabel={menu.accessibilityLabel ?? menu.title}
       icon={typeof menu.icon === "string" ? menu.icon : menu.icon.ios}
       separateBackground={menu.separateBackground ?? true}
-    >
-      {menu.status ? <Toolbar.Label>{menu.status}</Toolbar.Label> : null}
-      {renderMenuItems(menu.items)}
-    </Toolbar.Menu>
+      onPress={() =>
+        portalActionSheet.present({
+          title: menu.title,
+          ...(menu.status === undefined ? {} : { subtitle: menu.status }),
+          entries: sheetEntriesFromAppBarMenuItems(menu.items),
+        })
+      }
+    />
   );
 }

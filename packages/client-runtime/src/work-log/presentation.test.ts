@@ -4,6 +4,7 @@ import { ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3tools/con
 import * as DateTime from "effect/DateTime";
 
 import {
+  markdownLinePlainText,
   resolveWorkEntryToolPresentation,
   toolItemForDisplay,
   type WorkLogPresentationEntry,
@@ -202,5 +203,15 @@ describe("resolveWorkEntryToolPresentation", () => {
         toolData: { server: "another-server", tool: "preview_click" },
       }),
     ).toBeNull();
+  });
+});
+
+describe("markdownLinePlainText", () => {
+  it("reads one line of markdown as plain text and keeps the whole line", () => {
+    expect(
+      markdownLinePlainText(
+        "go, then pair `100.82.4.108:3783`. Read **[the docs](https://x.dev)** next",
+      ),
+    ).toBe("go, then pair 100.82.4.108:3783. Read the docs next");
   });
 });

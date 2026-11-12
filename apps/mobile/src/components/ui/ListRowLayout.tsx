@@ -74,8 +74,7 @@ export function ListRowLayout({
         <AppText
           textRole="footnote"
           className="max-w-[40%] shrink text-right text-foreground-muted"
-          numberOfLines={1}
-          ellipsizeMode="middle"
+          numberOfLines={2}
         >
           {detail}
         </AppText>

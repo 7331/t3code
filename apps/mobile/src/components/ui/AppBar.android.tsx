@@ -132,7 +132,7 @@ function AppBarView(props: AppBarProps & { readonly searchState?: SearchState })
         filter={
           menu
             ? {
-                accessibilityLabel: menu.title,
+                accessibilityLabel: menu.accessibilityLabel ?? menu.title,
                 customized: icon?.endsWith(".fill") === true,
                 actions: menuActionsFromAppBarItems(menu.items),
                 onSelect: (id) => selectMenuItem(menu.items, id),
@@ -151,7 +151,10 @@ function AppBarView(props: AppBarProps & { readonly searchState?: SearchState })
       title={menu.status ?? menu.title}
       onPressAction={({ nativeEvent }) => selectMenuItem(menu.items, nativeEvent.event)}
     >
-      <ScreenHeaderButton accessibilityLabel={menu.title} icon={menu.icon} />
+      <ScreenHeaderButton
+        accessibilityLabel={menu.accessibilityLabel ?? menu.title}
+        icon={menu.icon}
+      />
     </Menu>
   ));
   const confirmButton = props.confirm ? (

@@ -25,7 +25,11 @@ import {
   formatWorkingDurationLabel,
   resolveThreadWorkingStartedAt,
 } from "@t3tools/client-runtime/state/models";
-import { AuthOrchestrationOperateScope, type EnvironmentMachineKind } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  type EnvironmentId,
+  type EnvironmentMachineKind,
+} from "@t3tools/contracts";
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
 import { canSnooze } from "@t3tools/client-runtime/state/thread-settled";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
@@ -319,6 +323,42 @@ export const ThreadListV2SettledShelfHeader = memo(function ThreadListV2SettledS
   props: ThreadListV2ShelfHeaderProps,
 ) {
   return <ThreadListV2ShelfHeader {...props} kind="settled" />;
+});
+
+/** Heads one project's threads when the list is grouped by project, like a Portal server label. */
+export const ThreadListV2ProjectHeader = memo(function ThreadListV2ProjectHeader(props: {
+  readonly pane?: "screen" | "sidebar";
+  readonly environmentId: EnvironmentId;
+  readonly project: EnvironmentProject | null;
+  readonly title: string;
+}) {
+  const sidebarPane = props.pane === "sidebar";
+  return (
+    <View
+      accessibilityRole="header"
+      className={cn("mb-1 mt-4 flex-row items-center gap-2", sidebarPane ? "px-3" : "px-5")}
+    >
+      {props.project ? (
+        <ProjectFavicon
+          environmentId={props.environmentId}
+          faviconPath={props.project.faviconPath}
+          projectIcon={props.project.projectIcon}
+          size={16}
+          projectTitle={props.title}
+          workspaceRoot={props.project.workspaceRoot}
+        />
+      ) : null}
+      <Text
+        numberOfLines={1}
+        className={cn(
+          "min-w-0 flex-1 text-[13px] font-t3-medium",
+          sidebarPane ? "text-drawer-foreground-muted" : "text-foreground-secondary",
+        )}
+      >
+        {props.title}
+      </Text>
+    </View>
+  );
 });
 
 export const ThreadListV2ShowMoreRow = memo(function ThreadListV2ShowMoreRow(props: {

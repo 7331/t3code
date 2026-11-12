@@ -10,7 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CompactBrandTitle } from "../../../components/CompactBrandTitle";
 import { SymbolView } from "../../../components/ui/AppSymbol";
@@ -117,7 +117,7 @@ export function PortalWorkspaceDrawer() {
       </Animated.View>
       <Animated.View
         pointerEvents={open ? "auto" : "none"}
-        className="border-border bg-drawer"
+        className="border-border bg-screen"
         style={{
           borderRightWidth: StyleSheet.hairlineWidth,
           bottom: 0,
@@ -173,9 +173,12 @@ export function PortalWorkspaceDrawer() {
             </View>
           </View>
           <View className="min-h-0 flex-1">
-            <PaneContext value="sidebar">
-              <HomeRouteScreen />
-            </PaneContext>
+            {/* The panel already clears the status bar; the list must not inset for it again. */}
+            <SafeAreaInsetsContext value={{ ...insets, top: 0 }}>
+              <PaneContext value="sidebar">
+                <HomeRouteScreen />
+              </PaneContext>
+            </SafeAreaInsetsContext>
           </View>
         </View>
         <View className="gap-1 px-3 pb-2 pt-2">

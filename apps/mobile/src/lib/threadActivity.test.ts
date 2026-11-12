@@ -2089,6 +2089,25 @@ it.each([false, true])(
   },
 );
 
+it("previews a thought as plain text, not markdown source", () => {
+  const at = "2026-06-20T00:00:02.000Z";
+  const text =
+    "Export failed: **No Accounts** with `xcodebuild` and [the docs](https://example.com).";
+  const thought: OrchestrationV2TurnItem = {
+    ...base("markdown-thought", at, 1),
+    type: "reasoning",
+    text,
+    streaming: false,
+  };
+  const activity = buildThreadFeed([projected(userMessage(), 0), projected(thought, 1)]).flatMap(
+    (entry) => (entry.type === "activity-group" ? entry.activities : []),
+  )[0]!;
+  expect(workEntryRowLabel(activity.workEntry)).toBe(
+    "Export failed: No Accounts with xcodebuild and the docs.",
+  );
+  expect(activity.getCopyText()).toContain(text);
+});
+
 it("caps live thought previews while preserving reasoning detail", () => {
   const at = "2026-06-20T00:00:02.000Z";
   const text = "Considering the pending approval\n".repeat(100);

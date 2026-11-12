@@ -183,6 +183,8 @@ import { ComposerUsageLimits } from "./ComposerUsageLimits";
 import { PendingUserInputCard } from "./PendingUserInputCard";
 import { ProviderSubagentBar } from "./ProviderSubagentBar";
 import { ThreadCreationFailedCard } from "./ThreadCreationFailedCard";
+import { PortalComposerFoot } from "../portal/shell/PortalComposerFoot";
+import { usePortalPhoneShell } from "../portal/shell/usePortalPhoneShell";
 import {
   FLOATING_WORKING_CONTROL_COVERAGE,
   FloatingWorkingControl,
@@ -496,6 +498,7 @@ function ThreadDetailBody(
   const windowMetrics = useNativeLayoutMetrics();
   const nativeMetrics = usesNativeWorkspaceColumns ? columnMetrics : screenMetrics;
   const controlInsets = deriveBottomControlInsets(nativeMetrics);
+  const isPortalPhone = usePortalPhoneShell();
   const selectedThreadKey = scopedThreadKey(props.environmentId, props.selectedThread.id);
   const childThreadInputs = useChildThreadInputs({
     environmentId: props.environmentId,
@@ -1595,6 +1598,9 @@ function ThreadDetailBody(
                 list's bottom inset, so any padding above the pill/composer
                 pushes the resting content floor up by the same amount. */}
               <View onLayout={handleComposerOverlayLayout} className="w-full">
+                {isPortalPhone ? (
+                  <PortalComposerFoot statusRowHeight={floatingControlCoverage} />
+                ) : null}
                 <View className="w-full self-center" style={{ maxWidth: contentMaxWidth }}>
                   <FloatingWorkingControl
                     colorScheme={isDarkMode ? "dark" : "light"}

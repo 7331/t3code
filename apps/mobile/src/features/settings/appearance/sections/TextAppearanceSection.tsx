@@ -33,7 +33,7 @@ export function TextAppearanceSection() {
       />
       <SettingsSwitchRow
         disabled={!isReady}
-        icon="plusminus"
+        icon="x.squareroot"
         label="Render math"
         value={mathRenderingEnabled}
         onValueChange={setMathRenderingEnabled}

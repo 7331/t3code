@@ -273,6 +273,9 @@ export function workEntryRowLabel(entry: WorkLogPresentationEntry, expanded = fa
   if (entry.itemType === "fork") return entry.label;
   if (expanded && entry.itemType === "reasoning")
     return entry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought";
+  // A thought's one-line preview reads like the live header: plain text, never markdown source.
+  if (entry.itemType === "reasoning" && entry.detail?.trim())
+    return compactWorkEntryText(liveThoughtLine(entry.detail)) || entry.label;
   const presentation = resolveWorkEntryToolPresentation(entry);
   if (presentation) return presentation.displayName;
   if (entry.command?.trim()) return compactWorkEntryText(commandDisplayText(entry.command));

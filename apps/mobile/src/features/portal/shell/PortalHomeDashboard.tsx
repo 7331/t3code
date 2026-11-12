@@ -1,10 +1,13 @@
 import { useNavigation } from "@react-navigation/native";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { cn } from "../../../lib/cn";
-import { scopedThreadKey } from "../../../lib/scopedEntities";
+import { scopedProjectKey, scopedThreadKey } from "../../../lib/scopedEntities";
+import { useMobileProjectGroupingSettings } from "../../../state/project-grouping";
+import { buildHomeProjectScopes } from "../../home/homeThreadList";
 import { SymbolView } from "../../../components/ui/AppSymbol";
 import { AppText } from "../../../components/ui/AppText";
 import { Button } from "../../../components/ui/Button";
@@ -24,7 +27,6 @@ import { resolveThreadListV2Status, type ThreadListV2Status } from "../../thread
 import { useProjects } from "../../../state/entities";
 import { steadyNavigationThreadShellsAtom } from "../../../state/threads";
 import { useLaunchingThreads } from "../../../state/use-pending-new-tasks";
-import { useSavedRemoteConnections } from "../../../state/use-remote-environment-registry";
 import { useWorkspaceState } from "../../../state/workspace";
 import { useAtomValueWhileVisible, useHomeRouteVisible } from "../../home/home-route-visibility";
 import { AmbientSkyBackdrop, AmbientSkyClear } from "../sky/AmbientSky";
@@ -62,31 +64,47 @@ function PortalDashboardContent() {
   );
   const projects = useProjects();
   const { state: catalogState } = useWorkspaceState();
-  const { savedConnectionsById } = useSavedRemoteConnections();
   const enabled = useEnabledNavigationTabs();
 
-  const connections = Object.values(savedConnectionsById);
-  const projectTitleById = new Map(projects.map((project) => [project.id, project.title]));
+  const { sidebarProjectGroupingMode } = useMobileProjectGroupingSettings();
+  // Projects group like the sidebar: a repository's worktrees and folders under one title.
+  const projectGroupByKey = new Map(
+    buildHomeProjectScopes({
+      projects,
+      environmentId: null,
+      projectGroupingMode: sidebarProjectGroupingMode,
+    }).flatMap((scope) =>
+      scope.projectRefs.map(
+        (ref) => [scopedProjectKey(ref.environmentId, ref.projectId), scope] as const,
+      ),
+    ),
+  );
+  const projectGroupOf = (thread: EnvironmentThreadShell) =>
+    projectGroupByKey.get(scopedProjectKey(thread.environmentId, thread.projectId));
+  const projectTitleOf = (thread: EnvironmentThreadShell) => projectGroupOf(thread)?.title;
   const isActive = (thread: EnvironmentThreadShell) =>
     ACTIVE_STATUSES.has(resolveThreadListV2Status(thread));
   const working = threads
     .filter((thread) => thread.archivedAt === null && isActive(thread))
     .slice(0, 4);
-  const recent = threads
-    .filter((thread) => thread.archivedAt === null && !isActive(thread))
+  // Recent threads group under their project, the most recently touched project first.
+  const recentByProject = new Map<string, EnvironmentThreadShell[]>();
+  for (const thread of threads
+    .filter((candidate) => candidate.archivedAt === null && !isActive(candidate))
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-    .slice(0, 3);
+    .slice(0, 6)) {
+    const key =
+      projectGroupOf(thread)?.key ?? scopedProjectKey(thread.environmentId, thread.projectId);
+    const group = recentByProject.get(key);
+    if (group === undefined) recentByProject.set(key, [thread]);
+    else group.push(thread);
+  }
+  const recentGroups = [...recentByProject.entries()].slice(0, 3);
   const openThread = (thread: EnvironmentThreadShell) =>
     selectDetail({
       name: "Thread",
       params: { environmentId: String(thread.environmentId), threadId: String(thread.id) },
     });
-  const subtitle =
-    connections.length === 0
-      ? "Connect an environment to start coding sessions."
-      : connections.length === 1
-        ? connections[0]?.environmentLabel
-        : `${connections.length} environments`;
   const destinations = enabled
     .filter((tab) => tab !== "threads")
     .map((tab) => ({
@@ -110,10 +128,6 @@ function PortalDashboardContent() {
         <View className="mx-auto w-full max-w-[430px]">
           <AmbientSkyClear>
             <View className="gap-7">
-              <View className="gap-1.5">
-                <AppText className="text-3xl font-semibold">T3 Code</AppText>
-                <AppText className="text-sm text-foreground-muted">{subtitle}</AppText>
-              </View>
               {catalogState.hasConnections ? (
                 <Button
                   fullWidth
@@ -123,83 +137,79 @@ function PortalDashboardContent() {
                   onPress={startNewTask}
                 />
               ) : (
-                <Button
-                  fullWidth
-                  icon="plus"
-                  label="Add environment"
-                  tone="primary"
-                  onPress={() => openSettings(navigation, "SettingsEnvironmentNew")}
-                />
+                <View className="gap-3">
+                  <AppText textRole="footnote" className="text-foreground-secondary">
+                    Connect an environment to start coding sessions.
+                  </AppText>
+                  <Button
+                    fullWidth
+                    icon="plus"
+                    label="Add environment"
+                    tone="primary"
+                    onPress={() => openSettings(navigation, "SettingsEnvironmentNew")}
+                  />
+                </View>
               )}
               {working.length > 0 ? (
-                <View className="gap-2">
-                  <AppText className="text-2xs font-semibold uppercase tracking-wide text-foreground-muted">
-                    Working now
-                  </AppText>
-                  {working.map((thread) => {
+                <DashboardSection title="Working now">
+                  {working.map((thread, index) => {
                     const status = resolveThreadListV2Status(thread);
                     return (
-                      <ThreadCard
+                      <ThreadRow
                         key={scopedThreadKey(thread.environmentId, thread.id)}
+                        isFirst={index === 0}
                         thread={thread}
-                        projectTitle={projectTitleById.get(thread.projectId)}
+                        projectTitle={projectTitleOf(thread)}
                         dotClassName={STATUS_SUMMARY[status]?.dotClassName ?? "bg-primary"}
                         statusLabel={STATUS_SUMMARY[status]?.label}
                         onPress={() => openThread(thread)}
                       />
                     );
                   })}
-                </View>
+                </DashboardSection>
               ) : null}
-              {recent.length > 0 ? (
-                <View className="gap-2">
-                  <AppText className="text-2xs font-semibold uppercase tracking-wide text-foreground-muted">
-                    Recent sessions
-                  </AppText>
-                  {recent.map((thread) => (
-                    <ThreadCard
+              {recentGroups.map(([projectKey, group]) => (
+                <DashboardSection
+                  key={projectKey}
+                  title={projectTitleOf(group[0]!) ?? "No project"}
+                >
+                  {group.map((thread, index) => (
+                    <ThreadRow
                       key={scopedThreadKey(thread.environmentId, thread.id)}
+                      isFirst={index === 0}
                       thread={thread}
-                      projectTitle={projectTitleById.get(thread.projectId)}
                       onPress={() => openThread(thread)}
                     />
                   ))}
-                </View>
-              ) : null}
+                </DashboardSection>
+              ))}
               {destinations.length > 0 ? (
-                <View className="gap-2">
-                  <AppText className="text-2xs font-semibold uppercase tracking-wide text-foreground-muted">
-                    Browse
-                  </AppText>
-                  <View className="overflow-hidden rounded-[14px] bg-subtle">
-                    {destinations.map((destination, index) => (
-                      <Pressable
-                        key={destination.key}
-                        accessibilityRole="button"
-                        className={cn(
-                          "h-12 flex-row items-center gap-3 px-4 active:opacity-70",
-                          index > 0 && "border-border",
-                        )}
-                        style={index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth } : undefined}
-                        onPress={destination.onPress}
-                      >
-                        <SymbolView
-                          name={destination.icon}
-                          size={17}
-                          tintColorClassName="accent-foreground-muted"
-                        />
-                        <AppText className="min-w-0 flex-1 text-[15px] text-foreground">
-                          {destination.label}
-                        </AppText>
-                        <SymbolView
-                          name="chevron.right"
-                          size={12}
-                          tintColorClassName="accent-foreground-muted"
-                        />
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
+                <DashboardSection title="Browse">
+                  {destinations.map((destination, index) => (
+                    <Pressable
+                      key={destination.key}
+                      accessibilityRole="button"
+                      accessibilityLabel={destination.label}
+                      className="min-h-12.5 flex-row items-center gap-3 px-4 active:bg-row-hover"
+                      onPress={destination.onPress}
+                    >
+                      {index > 0 ? <RowSeparator /> : null}
+                      <SymbolView
+                        name={destination.icon}
+                        size={20}
+                        tintColorClassName="accent-icon"
+                      />
+                      <AppText className="min-w-0 flex-1 font-t3-medium text-[15px] text-foreground">
+                        {destination.label}
+                      </AppText>
+                      <SymbolView
+                        name="chevron.right"
+                        size={13}
+                        tintColorClassName="accent-chevron"
+                      />
+                    </Pressable>
+                  ))}
+                </DashboardSection>
               ) : null}
             </View>
           </AmbientSkyClear>
@@ -209,34 +219,60 @@ function PortalDashboardContent() {
   );
 }
 
-function ThreadCard(props: {
+function DashboardSection(props: { readonly title: string; readonly children: ReactNode }) {
+  return (
+    <View className="gap-1.5">
+      <AppText textRole="label" className="px-4 text-foreground-secondary">
+        {props.title}
+      </AppText>
+      <View className="overflow-hidden rounded-2xl bg-grouped-card">{props.children}</View>
+    </View>
+  );
+}
+
+function RowSeparator() {
+  return (
+    <View
+      pointerEvents="none"
+      className="absolute left-4 right-0 top-0 bg-separator"
+      style={{ height: StyleSheet.hairlineWidth }}
+    />
+  );
+}
+
+function ThreadRow(props: {
   readonly thread: EnvironmentThreadShell;
-  readonly projectTitle: string | undefined;
+  readonly isFirst: boolean;
+  /** Left out where the section already names the project. */
+  readonly projectTitle?: string | undefined;
   readonly dotClassName?: string;
   readonly statusLabel?: string;
   readonly onPress: () => void;
 }) {
+  const title = props.thread.title || "Untitled task";
   const detail = [props.statusLabel, props.projectTitle].filter(Boolean).join(" · ");
   return (
     <Pressable
       accessibilityRole="button"
-      className="flex-row items-center gap-3 rounded-[14px] bg-subtle px-4 py-3 active:opacity-70"
+      accessibilityLabel={[title, detail].filter(Boolean).join(", ")}
+      className="min-h-12.5 flex-row items-center gap-3 px-4 py-2 active:bg-row-hover"
       onPress={props.onPress}
     >
+      {props.isFirst ? null : <RowSeparator />}
       {props.dotClassName ? (
         <View className={cn("h-2 w-2 rounded-full", props.dotClassName)} />
       ) : null}
-      <View className="min-w-0 flex-1 gap-0.5">
-        <AppText className="text-[15px] font-semibold text-foreground" numberOfLines={1}>
-          {props.thread.title || "Untitled task"}
+      <View className="min-w-0 flex-1">
+        <AppText className="font-t3-medium text-[15px] text-foreground" numberOfLines={1}>
+          {title}
         </AppText>
         {detail ? (
-          <AppText className="text-xs text-foreground-muted" numberOfLines={1}>
+          <AppText textRole="label" className="text-foreground-secondary" numberOfLines={1}>
             {detail}
           </AppText>
         ) : null}
       </View>
-      <SymbolView name="chevron.right" size={12} tintColorClassName="accent-foreground-muted" />
+      <SymbolView name="chevron.right" size={13} tintColorClassName="accent-chevron" />
     </Pressable>
   );
 }

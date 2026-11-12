@@ -1,112 +1,77 @@
-import { MenuView } from "@react-native-menu/menu";
+import * as Haptics from "expo-haptics";
+import { cloneElement, isValidElement, useEffect, useId, useState, type ReactElement } from "react";
+import { Pressable, View, type PressableProps } from "react-native";
+
 import {
-  cloneElement,
-  isValidElement,
-  useMemo,
-  useRef,
-  type ComponentProps,
-  type ReactElement,
-} from "react";
-import type { ColorValue, PressableProps } from "react-native";
-import { withUniwind } from "uniwind";
-import { useAppearancePreferences } from "../../features/settings/appearance/AppearancePreferencesProvider";
-import { withMenuActionIconColors } from "../../lib/menu-action-colors";
+  portalActionSheet,
+  type PortalActionSheetContent,
+} from "../../features/portal/sheet/portalActionSheet";
+import { sheetEntriesFromMenuActions } from "../../features/portal/sheet/portalSheetEntries";
 import type { MenuProps } from "./Menu.types";
 
-const ThemedMenuView = withUniwind(
-  function NativeMenuView({
-    iconColor,
-    destructiveIconColor,
-    ...props
-  }: ComponentProps<typeof MenuView> & {
-    readonly iconColor?: ColorValue;
-    readonly destructiveIconColor?: ColorValue;
-  }) {
-    const actions = useMemo(
-      () =>
-        withMenuActionIconColors(props.actions, {
-          icon: iconColor,
-          destructiveIcon: destructiveIconColor,
-        }),
-      [props.actions, iconColor, destructiveIconColor],
-    );
-    return <MenuView {...props} actions={actions} />;
-  },
-  {
-    iconColor: { fromClassName: "iconColorClassName", styleProperty: "accentColor" },
-    destructiveIconColor: {
-      fromClassName: "destructiveIconColorClassName",
-      styleProperty: "accentColor",
-    },
-  },
-);
-
+/**
+ * The fork's menus are Portal action sheets: a tap (or a long press on a row) raises a bottom
+ * sheet of grouped rows instead of UIKit's glass popover.
+ */
 export function Menu(props: MenuProps) {
-  const { themeAppearance } = useAppearancePreferences();
-  const isDarkMode = themeAppearance === "dark";
-  const menuPress = useRef({ isPreparing: false, isOpen: false, suppressPress: false });
-  const pendingPress = useRef<(() => void) | null>(null);
+  const ownerId = useId();
+  const [isOpen, setIsOpen] = useState(false);
+  const { onPressAction, onCloseMenu } = props;
 
-  const { className: _className, ...menuProps } = props;
-  let children = menuProps.children;
-  if (props.shouldOpenOnLongPress && isValidElement(children)) {
-    const child = children as ReactElement<Pick<PressableProps, "onTouchStart" | "onPress">>;
-    /* oxlint-disable react/refs -- Cloning the trigger installs event callbacks; the refs are accessed when those callbacks run. */
-    children = cloneElement(child, {
-      onTouchStart: (event) => {
-        // onPressIn can repeat within one gesture when a finger leaves and re-enters the row.
-        menuPress.current.isPreparing = false;
-        menuPress.current.suppressPress = menuPress.current.isOpen;
-        pendingPress.current = null;
-        child.props.onTouchStart?.(event);
-      },
-      onPress: (event) => {
-        // Accessibility clicks lack touch identifiers and must ignore previous touch cancellation.
-        const isTouch = typeof event.nativeEvent.identifier === "number";
-        if (isTouch ? menuPress.current.suppressPress : menuPress.current.isOpen) {
-          return;
-        }
-        if (isTouch && menuPress.current.isPreparing) {
-          // A release can precede native display; let UIKit's display/cancel callback decide its outcome.
-          event.persist();
-          pendingPress.current = () => child.props.onPress?.(event);
-          return;
-        }
-        child.props.onPress?.(event);
-      },
-    });
-    /* oxlint-enable react/refs */
-    menuProps.onMenuInteractionStart = () => {
-      menuPress.current.isPreparing = true;
-      props.onMenuInteractionStart?.();
-    };
-    menuProps.onOpenMenu = () => {
-      menuPress.current.isPreparing = false;
-      menuPress.current.isOpen = true;
-      menuPress.current.suppressPress = true;
-      pendingPress.current = null;
-      props.onOpenMenu?.();
-    };
-    menuProps.onCloseMenu = () => {
-      menuPress.current.isPreparing = false;
-      menuPress.current.isOpen = false;
-      // Keep cancellation through finger-up even if the menu dismisses first.
-      const press = pendingPress.current;
-      pendingPress.current = null;
-      props.onCloseMenu?.();
-      if (!menuPress.current.suppressPress) {
-        press?.();
-      }
-    };
+  const content: PortalActionSheetContent = {
+    ...(props.title === undefined ? {} : { title: props.title }),
+    entries: sheetEntriesFromMenuActions(props.actions, {
+      onSelect: (actionId) => onPressAction?.({ nativeEvent: { event: actionId } }),
+    }),
+    onDismiss: () => {
+      setIsOpen(false);
+      onCloseMenu?.();
+    },
+  };
+
+  // An open menu refreshes its rows when the owner re-renders, such as a toggled checkmark.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes this menu's current rows into the shared sheet host while it is open
+  useEffect(() => {
+    if (isOpen) portalActionSheet.update(ownerId, content);
+  });
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- closes this menu's sheet when its trigger unmounts
+  useEffect(() => () => portalActionSheet.dismiss(ownerId), [ownerId]);
+
+  const open = () => {
+    props.onMenuInteractionStart?.();
+    setIsOpen(true);
+    portalActionSheet.present(content, { ownerId });
+    props.onOpenMenu?.();
+  };
+
+  if (props.shouldOpenOnLongPress && isValidElement(props.children)) {
+    const child = props.children as ReactElement<Pick<PressableProps, "onLongPress">>;
+    return (
+      <View style={props.style} className={props.className} testID={props.testID}>
+        {cloneElement(child, {
+          onLongPress: () => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            open();
+          },
+        })}
+      </View>
+    );
   }
   return (
-    <ThemedMenuView
-      {...menuProps}
-      iconColorClassName="accent-icon"
-      destructiveIconColorClassName="accent-danger-foreground"
-      themeVariant={isDarkMode ? "dark" : "light"}
+    <Pressable
+      accessible={props.accessible}
+      accessibilityLabel={props.accessibilityLabel ?? props.title}
+      accessibilityRole={props.accessibilityRole ?? "button"}
+      hitSlop={props.hitSlop}
+      onPress={open}
+      style={props.style}
+      className={props.className}
+      testID={props.testID}
     >
-      {children}
-    </ThemedMenuView>
+      <View pointerEvents="none" style={{ flexGrow: 1 }}>
+        {props.children}
+      </View>
+    </Pressable>
   );
 }

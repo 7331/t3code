@@ -5,6 +5,7 @@ import { Platform } from "react-native";
 import { useAdaptiveWorkspaceLayout } from "../../features/layout/adaptive-workspace-context";
 import { NATIVE_MAIL_SEARCH_TOOLBAR_CONTENT_INSET } from "../../features/layout/native-mail-search-toolbar";
 import { useNativeMailSearchToolbar } from "../../native/use-native-mail-search-toolbar";
+import { usePortalPhoneShell } from "../../features/portal/shell/usePortalPhoneShell";
 import type { AppBarSearch } from "./AppBar.types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -59,7 +60,10 @@ export function useContentBottomInset(): number {
 export function useSearchToolbarInset(search: AppBarSearch | undefined): number {
   const { layout } = useAdaptiveWorkspaceLayout();
   const usesNativeMailSearchToolbar = useNativeMailSearchToolbar();
+  // The Portal phone shell stacks search under the title (see AppBar), so nothing covers the end.
+  const portalPhoneShell = usePortalPhoneShell();
   return search !== undefined &&
+    !portalPhoneShell &&
     (search.compactToolbar ?? !layout.usesSplitView) &&
     usesNativeMailSearchToolbar
     ? NATIVE_MAIL_SEARCH_TOOLBAR_CONTENT_INSET
