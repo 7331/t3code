@@ -38,6 +38,10 @@ import {
   useSystemWorkspaceTabBar,
 } from "./useSystemWorkspaceTabBar";
 import { openSettings } from "../../settings/settings-navigation";
+import { PortalHomeDashboard } from "../../portal/shell/PortalHomeDashboard";
+import { portalDrawer } from "../../portal/shell/portalDrawerStore";
+import { usePortalPhoneShell } from "../../portal/shell/usePortalPhoneShell";
+import { withNativeGlassHeaderItem } from "../native-glass-header-items";
 
 const TAB_TITLES = WORKSPACE_TAB_LABELS;
 
@@ -89,6 +93,17 @@ function WorkspaceRootContent() {
   const { state } = workspace;
   // Settings is a workspace tab too; its list takes the place of the selected tab's.
   const settingsOpen = workspace.settingsOpen;
+  const portalShell = usePortalPhoneShell();
+  const portalDrawerItem = portalShell
+    ? withNativeGlassHeaderItem({
+        accessibilityLabel: "Open sidebar",
+        icon: { name: "sidebar.left", type: "sfSymbol" as const },
+        identifier: "portal-workspace-sidebar",
+        label: "Open sidebar",
+        onPress: () => portalDrawer.setOpen(!portalDrawer.open()),
+        type: "button" as const,
+      })
+    : null;
   const renderHeaderTitle = () => (
     <WorkspaceRootTitle
       columnWidth={width}
@@ -123,6 +138,7 @@ function WorkspaceRootContent() {
             width,
             sidebarNavigation,
             enabled.length,
+            portalShell,
           ]}
           options={{
             title: settingsOpen
@@ -139,7 +155,7 @@ function WorkspaceRootContent() {
             ...(enabled.length === 0
               ? { headerSearchBarOptions: undefined, unstable_headerRightItems: () => [] }
               : {}),
-            unstable_headerLeftItems: () => [],
+            unstable_headerLeftItems: () => (portalDrawerItem ? [portalDrawerItem] : []),
             // Beside a detail column the tab bar names the tab and the detail header the page,
             // so the sidebar keeps the brand.
             headerTitle:
@@ -154,7 +170,11 @@ function WorkspaceRootContent() {
           ) : enabled.length === 0 ? (
             <WorkspaceNoTabs />
           ) : state.selectedTab === "threads" ? (
-            <HomeRouteScreen />
+            portalShell ? (
+              <PortalHomeDashboard />
+            ) : (
+              <HomeRouteScreen />
+            )
           ) : state.selectedTab === "pullRequests" ? (
             <PullRequestsScreen />
           ) : (
