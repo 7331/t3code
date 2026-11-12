@@ -121,6 +121,20 @@
               chrome: "oklch(0.225975 0.031062 293.741)",
             },
           },
+          portal: {
+            light: {
+              background: "#f7f7f8",
+              foreground: "#202025",
+              accent: "#245f85",
+              chrome: "#f7f7f8",
+            },
+            dark: {
+              background: "#1c1c1f",
+              foreground: "#f4f4f6",
+              accent: "#80c8ef",
+              chrome: "#1c1c1f",
+            },
+          },
         };
         const BUILT_IN_THEME_MODES = Object.fromEntries(
           Object.entries(BUILT_IN_THEME_PALETTES).map(([id, palettes]) => [
@@ -137,6 +151,7 @@
           "ocean",
           "ember",
           "iris",
+          "portal",
           "t3-chat-dark",
           "t3-grove",
           "t3-ocean",

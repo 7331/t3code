@@ -368,6 +368,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["latex tex katex equations formulas markdown"],
   },
   {
+    id: "ambient-sky",
+    title: "Ambient sky",
+    to: "/settings/appearance",
+    searchTerms: ["portal ascii stars wind background animation"],
+  },
+  {
     id: "panel-animations",
     title: "Panel animations",
     to: "/settings/appearance",

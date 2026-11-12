@@ -10,6 +10,7 @@ export const RESERVED_THEME_IDS: ReadonlySet<string> = new Set([
   "light",
   "dark",
   ...BUILT_IN_THEME_IDS,
+  "portal",
   "t3-chat-dark",
   "t3-grove",
   "t3-ocean",

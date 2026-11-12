@@ -2,6 +2,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { SidebarInset } from "./ui/sidebar";
 import { isElectron } from "../env";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
+import { AmbientSky } from "../portal/sky/AmbientSky";
 
 export function NoActiveThreadState() {
   return (
@@ -19,16 +20,19 @@ export function NoActiveThreadState() {
           )}
         </WorkspacePageHeader>
 
-        <Empty className="flex-1">
-          <div className="w-full max-w-lg px-8 py-12">
-            <EmptyHeader className="max-w-none">
-              <EmptyTitle>Pick a thread to continue</EmptyTitle>
-              <EmptyDescription>
-                Select an existing thread or create a new one to get started.
-              </EmptyDescription>
-            </EmptyHeader>
-          </div>
-        </Empty>
+        <div className="relative isolate flex min-h-0 flex-1 flex-col">
+          <AmbientSky />
+          <Empty className="flex-1">
+            <div data-sky-clear className="w-full max-w-lg px-8 py-12">
+              <EmptyHeader className="max-w-none">
+                <EmptyTitle>Pick a thread to continue</EmptyTitle>
+                <EmptyDescription>
+                  Select an existing thread or create a new one to get started.
+                </EmptyDescription>
+              </EmptyHeader>
+            </div>
+          </Empty>
+        </div>
       </div>
     </SidebarInset>
   );

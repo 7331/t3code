@@ -348,6 +348,29 @@ export function AppearanceSettingsPanel() {
             />
           }
         />
+        <SettingsRow
+          {...searchableSetting("ambient-sky")}
+          description="Drifting ASCII stars and wind on empty screens while the Portal theme is on."
+          resetAction={
+            settings.ambientSkyEnabled !== DEFAULT_UNIFIED_SETTINGS.ambientSkyEnabled ? (
+              <SettingResetButton
+                label="ambient sky"
+                onClick={() =>
+                  updateSettings({
+                    ambientSkyEnabled: DEFAULT_UNIFIED_SETTINGS.ambientSkyEnabled,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.ambientSkyEnabled}
+              onCheckedChange={(checked) => updateSettings({ ambientSkyEnabled: Boolean(checked) })}
+              aria-label="Ambient sky"
+            />
+          }
+        />
         <AdvancedSettings
           targetIds={[
             searchableSetting("panel-animations").id,

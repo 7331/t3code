@@ -121,6 +121,21 @@
     {
       "bundles": ["assets", "web"],
       "license": "MIT",
+      "name": "ascii.rest stars and wind",
+      "noticeFile": "apps/web/src/portal/sky/LICENSE.ascii-rest",
+      "sourceUrl": "https://github.com/bas3line/ascii"
+    },
+    {
+      "bundles": ["assets", "web"],
+      "license": "Ubuntu-font-1.0",
+      "name": "Ubuntu font",
+      "noticeFile": "apps/web/src/portal/fonts/LICENSE",
+      "sourceUrl": "https://github.com/fontsource/font-files/tree/main/fonts/google/ubuntu",
+      "version": "5.2.8"
+    },
+    {
+      "bundles": ["assets", "web"],
+      "license": "MIT",
       "name": "Symbols Nerd Font Mono",
       "noticeFile": "apps/web/src/terminal/ghostty/fonts/LICENSE",
       "sourceUrl": "https://github.com/ryanoasis/nerd-fonts"
