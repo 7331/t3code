@@ -546,6 +546,18 @@
     "./speech": {
       "types": "./src/speech.ts",
       "import": "./src/speech.ts"
+    },
+    "./ambientSky/skyClock": {
+      "types": "./src/ambientSky/skyClock.ts",
+      "import": "./src/ambientSky/skyClock.ts"
+    },
+    "./ambientSky/starField": {
+      "types": "./src/ambientSky/starField.ts",
+      "import": "./src/ambientSky/starField.ts"
+    },
+    "./ambientSky/windField": {
+      "types": "./src/ambientSky/windField.ts",
+      "import": "./src/ambientSky/windField.ts"
     }
   },
   "scripts": {

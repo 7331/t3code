@@ -1,4 +1,4 @@
-// @license Adapted from ascii.rest: the "wind" piece (https://github.com/bas3line/ascii, src/pieces/wind.ts) (bas3line, MIT; licence in apps/web/src/portal/sky/LICENSE.ascii-rest); modified by Portal since 2026-10-29 and by T3 Code since 2026-11-12.
+// @license Adapted from ascii.rest: the "wind" piece (https://github.com/bas3line/ascii, src/pieces/wind.ts) (bas3line, MIT; licence in packages/shared/src/ambientSky/LICENSE.ascii-rest); modified by Portal since 2026-10-29 and by T3 Code since 2026-11-12.
 const GAP = 4;
 const BAR = "▔─▁";
 const END = "'·.";

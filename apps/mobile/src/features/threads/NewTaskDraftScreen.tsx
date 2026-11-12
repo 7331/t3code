@@ -79,6 +79,7 @@ import {
   useRemoteEnvironmentRuntime,
 } from "../../state/use-remote-environment-registry";
 import { useNewTaskFlow } from "./new-task-flow-provider";
+import { AmbientSkyBackdrop, AmbientSkyClear } from "../portal/sky/AmbientSky";
 import {
   nextEnvironmentId,
   useHardwareKeyboardCommand,
@@ -788,6 +789,7 @@ export function NewTaskDraftScreen(props: {
       {shareUnavailableNotice}
     </View>
   );
+  const draftHasContent = flow.prompt.trim().length > 0 || flow.attachments.length > 0;
   // The nested hero scroll view does not receive UIKit's automatic navigation inset in split columns.
   const heroViewport = (headerInset: number, bottomInset: number, viewportHeight: number) =>
     viewportHeight < SHORT_DRAFT_VIEWPORT_HEIGHT ? null : (
@@ -805,22 +807,24 @@ export function NewTaskDraftScreen(props: {
             overflow: "hidden",
           }}
         >
-          <ScrollView
-            alwaysBounceVertical={false}
-            className="flex-1"
-            contentInsetAdjustmentBehavior="never"
-            contentContainerClassName="grow items-center"
-            contentContainerStyle={{ paddingVertical: 24 }}
-            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            style={{ flex: 1 }}
-            testID="new-task-hero-scroll"
-          >
-            <View style={{ flexGrow: 1 }} />
-            {hero}
-            <View style={{ flexGrow: 2 }} />
-          </ScrollView>
+          <AmbientSkyBackdrop isStill={draftHasContent}>
+            <ScrollView
+              alwaysBounceVertical={false}
+              className="flex-1"
+              contentInsetAdjustmentBehavior="never"
+              contentContainerClassName="grow items-center"
+              contentContainerStyle={{ paddingVertical: 24 }}
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              testID="new-task-hero-scroll"
+            >
+              <View style={{ flexGrow: 1 }} />
+              <AmbientSkyClear>{hero}</AmbientSkyClear>
+              <View style={{ flexGrow: 2 }} />
+            </ScrollView>
+          </AmbientSkyBackdrop>
         </View>
       </NativeScrollEdgeEffectsContext>
     );

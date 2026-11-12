@@ -12,6 +12,7 @@ import {
   GROVE_THEME,
   IRIS_THEME,
   OCEAN_THEME,
+  PORTAL_THEME,
   T3_CHAT_THEME,
   T3_CODE_LIGHT_THEME_COLORS,
   T3_CODE_DARK_THEME_COLORS,
@@ -28,7 +29,6 @@ import {
   contextChipColorVariable,
   type ContextChipAccentKind,
 } from "./lib/contextChipAccents";
-import { PORTAL_THEME } from "./portal/portalTheme";
 
 import { appAtomRegistry, subscribeAtomChanges } from "./rpc/atomRegistry";
 import { themeServerEnvironmentThemesAtom } from "./state/server";
@@ -1193,10 +1193,7 @@ export function updateThemeColorFamily(
   }
 }
 
-export const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = [
-  ...BUILT_IN_THEMES,
-  PORTAL_THEME,
-];
+export const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = BUILT_IN_THEMES;
 
 export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | null {
   const themeId = themeIdFromPreference(theme);

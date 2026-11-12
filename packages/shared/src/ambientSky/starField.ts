@@ -1,4 +1,4 @@
-// @license Adapted from ascii.rest: after https://7331.org, whose stars are the aurora piece (bas3line, MIT; licence in apps/web/src/portal/sky/LICENSE.ascii-rest); modified by Portal since 2026-10-29 and by T3 Code since 2026-11-12.
+// @license Adapted from ascii.rest: after https://7331.org, whose stars are the aurora piece (bas3line, MIT; licence in packages/shared/src/ambientSky/LICENSE.ascii-rest); modified by Portal since 2026-10-29 and by T3 Code since 2026-11-12.
 export interface Star {
   readonly column: number;
   readonly row: number;

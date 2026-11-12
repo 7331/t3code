@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { SKY_FRAME_MILLISECONDS, SkyClock, type SkyHost, type SkyHostListeners } from "./skyClock";
+import {
+  SKY_FRAME_MILLISECONDS,
+  SkyClock,
+  type SkyHost,
+  type SkyHostListeners,
+} from "./skyClock.ts";
 
 const frameSeconds = SKY_FRAME_MILLISECONDS / 1000;
 
@@ -14,7 +19,7 @@ function createFakeHost() {
     listenCount: 0,
     requestedDelays: [] as number[],
   };
-  const host: SkyHost = {
+  const host: SkyHost<number> = {
     isActive: () => state.active,
     now: () => state.now,
     setTimer: (callback, milliseconds) => {

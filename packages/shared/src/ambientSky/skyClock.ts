@@ -12,23 +12,23 @@ export interface SkyHostListeners {
   readonly onAppearanceChange: () => void;
 }
 
-export interface SkyHost {
+export interface SkyHost<Timer> {
   readonly isActive: () => boolean;
   readonly now: () => number;
-  readonly setTimer: (callback: () => void, milliseconds: number) => number;
-  readonly clearTimer: (timer: number) => void;
+  readonly setTimer: (callback: () => void, milliseconds: number) => Timer;
+  readonly clearTimer: (timer: Timer) => void;
   readonly listen: (listeners: SkyHostListeners) => () => void;
 }
 
-export class SkyClock {
+export class SkyClock<Timer> {
   private readonly members = new Set<SkyMember>();
   private playSeconds = 0;
   private lastTick = 0;
-  private timer: number | null = null;
+  private timer: Timer | null = null;
   private stopListening: (() => void) | null = null;
-  private readonly host: SkyHost;
+  private readonly host: SkyHost<Timer>;
 
-  constructor(host: SkyHost) {
+  constructor(host: SkyHost<Timer>) {
     this.host = host;
   }
 
@@ -75,34 +75,4 @@ export class SkyClock {
     for (const member of this.members) if (member.moving) member.draw(this.playSeconds);
     this.schedule();
   }
-}
-
-export function createBrowserSkyHost(): SkyHost {
-  return {
-    isActive: () => document.visibilityState === "visible" && document.hasFocus(),
-    now: () => performance.now(),
-    setTimer: (callback, milliseconds) => window.setTimeout(callback, milliseconds),
-    clearTimer: (timer) => window.clearTimeout(timer),
-    listen: ({ onActivityChange, onAppearanceChange }) => {
-      window.addEventListener("focus", onActivityChange);
-      window.addEventListener("blur", onActivityChange);
-      document.addEventListener("visibilitychange", onActivityChange);
-      const appearance = new MutationObserver(onAppearanceChange);
-      appearance.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class", "data-theme-id"],
-      });
-      let listening = true;
-      void document.fonts.ready.then(() => {
-        if (listening) onAppearanceChange();
-      });
-      return () => {
-        listening = false;
-        window.removeEventListener("focus", onActivityChange);
-        window.removeEventListener("blur", onActivityChange);
-        document.removeEventListener("visibilitychange", onActivityChange);
-        appearance.disconnect();
-      };
-    },
-  };
 }
