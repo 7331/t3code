@@ -124,10 +124,13 @@ const iosBundleIdentifier = isIosPersonalTeamBuild
   ? personalTeamBundleIdentifier!
   : variant.iosBundleIdentifier;
 
-const dmSansFonts = {
-  regular: "@expo-google-fonts/dm-sans/400Regular/DMSans_400Regular.ttf",
-  medium: "@expo-google-fonts/dm-sans/500Medium/DMSans_500Medium.ttf",
-  bold: "@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf",
+// Portal's typefaces (OFL, assets/fonts/LICENSE-OFL.txt), converted from Portal's woff2 files.
+// iOS resolves a family by PostScript name, which these fonts set to the names used below.
+const portalFonts = {
+  regular: "./assets/fonts/FluxerSans-Regular.ttf",
+  medium: "./assets/fonts/FluxerSans-Medium.ttf",
+  bold: "./assets/fonts/FluxerSans-Bold.ttf",
+  mono: "./assets/fonts/FluxerMono-Regular.ttf",
 } as const;
 
 const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
@@ -330,21 +333,25 @@ const config: ExpoConfig = {
       "expo-font",
       {
         ios: {
-          fonts: [dmSansFonts.regular, dmSansFonts.medium, dmSansFonts.bold],
+          fonts: [portalFonts.regular, portalFonts.medium, portalFonts.bold, portalFonts.mono],
         },
         android: {
           fonts: [
             {
-              fontFamily: "DMSans-Regular",
-              fontDefinitions: [{ path: dmSansFonts.regular, weight: 400 }],
+              fontFamily: "FluxerSans",
+              fontDefinitions: [{ path: portalFonts.regular, weight: 400 }],
             },
             {
-              fontFamily: "DMSans-Medium",
-              fontDefinitions: [{ path: dmSansFonts.medium, weight: 500 }],
+              fontFamily: "FluxerSans-Medm",
+              fontDefinitions: [{ path: portalFonts.medium, weight: 500 }],
             },
             {
-              fontFamily: "DMSans-Bold",
-              fontDefinitions: [{ path: dmSansFonts.bold, weight: 700 }],
+              fontFamily: "FluxerSans-Bold",
+              fontDefinitions: [{ path: portalFonts.bold, weight: 700 }],
+            },
+            {
+              fontFamily: "FluxerMono",
+              fontDefinitions: [{ path: portalFonts.mono, weight: 400 }],
             },
           ],
         },

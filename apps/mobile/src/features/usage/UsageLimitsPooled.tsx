@@ -383,7 +383,7 @@ function PoolWindowCard({
   );
   if (wide) {
     return (
-      <View className="flex-row items-center gap-6 rounded-[24px] border-continuous bg-grouped-card p-4">
+      <View className="flex-row items-center gap-6 rounded-2xl border-continuous bg-grouped-card p-4">
         <View className="w-44 gap-1">{summary}</View>
         <View className="min-w-0 flex-1 gap-1">
           {bar}
@@ -393,7 +393,7 @@ function PoolWindowCard({
     );
   }
   return (
-    <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
+    <View className="gap-3 rounded-2xl border-continuous bg-grouped-card p-4">
       {summary}
       {bar}
       {legend}
@@ -579,7 +579,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
                 </Text>
               ) : null}
             </View>
-            <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
+            <View className="gap-3 rounded-2xl border-continuous bg-grouped-card p-4">
               <Text className="text-sm font-t3-medium text-foreground">{window.label}</Text>
               <Text className="text-3xl font-t3-bold tabular-nums text-foreground">
                 {remainingPercent(window)}% left
@@ -604,7 +604,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
                 </Text>
               ) : null}
             </View>
-            <View className="gap-2 rounded-[24px] border-continuous bg-grouped-card p-4">
+            <View className="gap-2 rounded-2xl border-continuous bg-grouped-card p-4">
               <Text className="text-sm font-t3-medium text-foreground">
                 {account.environments.length ? "Signed in" : "Source"}
               </Text>
@@ -619,7 +619,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
               )}
             </View>
             {account.redeem && account.limits.resetCredits ? (
-              <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
+              <View className="gap-3 rounded-2xl border-continuous bg-grouped-card p-4">
                 <Text className="text-sm font-t3-medium text-foreground">Reset credits</Text>
                 <ResetCredits
                   key={account.key}

@@ -27,6 +27,7 @@ import {
   useScheduledTaskEditor,
 } from "./scheduled-task-editor";
 import { moveDraftToThread, unbindDraftFromThread } from "./scheduledTaskDraft";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 
 function MissingTaskDraft() {
   return (
@@ -245,6 +246,7 @@ export function ScheduledTaskThreadPickerRouteScreen() {
         data={rows}
         keyExtractor={(row) => row.key}
         extraData={selectedKey}
+        ListHeaderComponent={<PortalListSearch search={search} />}
         estimatedItemSize={56}
         recycleItems
         className="flex-1"

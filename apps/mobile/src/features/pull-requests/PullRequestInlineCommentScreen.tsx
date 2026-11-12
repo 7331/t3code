@@ -104,7 +104,7 @@ export function PullRequestInlineCommentScreen({ route }: StaticScreenProps<Inli
         />
       }
     >
-      <View className="gap-2 rounded-[20px] bg-grouped-card p-4">
+      <View className="gap-2 rounded-2xl bg-grouped-card p-4">
         <Text className="font-mono text-xs text-foreground-muted">{params.path}</Text>
         <Text selectable className="font-mono text-xs">
           {params.code}
@@ -124,7 +124,7 @@ export function PullRequestInlineCommentScreen({ route }: StaticScreenProps<Inli
         maxLength={65536}
         value={body}
         onChangeText={setBody}
-        className="min-h-32 rounded-[20px] bg-grouped-card p-4 text-base text-foreground"
+        className="min-h-32 rounded-[10px] bg-grouped-card p-4 text-base text-foreground"
         style={{ textAlignVertical: "top" }}
       />
       <Text className="text-xs text-foreground-muted">

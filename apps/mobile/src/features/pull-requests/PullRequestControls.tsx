@@ -25,7 +25,7 @@ export function PullRequestCardGroup(props: { readonly children: ReactNode }) {
   return (
     <Animated.View
       layout={PR_ROW_LAYOUT}
-      className="overflow-hidden rounded-[22px] border border-composer-border border-continuous bg-grouped-card"
+      className="overflow-hidden rounded-2xl border border-composer-border border-continuous bg-grouped-card"
     >
       {props.children}
     </Animated.View>

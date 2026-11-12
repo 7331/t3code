@@ -11,7 +11,6 @@ import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Atom, AsyncResult } from "effect/reactivity";
 
 import { ScopedTheme, ScopedVariables, Uniwind } from "uniwind";
-import { PORTAL_THEME_ID } from "@t3tools/shared/themePalettes";
 
 import {
   resolveAppearance,
@@ -29,11 +28,6 @@ import {
 import { materialYouPaletteToMobileThemeVariables } from "../../../lib/materialYouTheme";
 import { getMobileThemeRuntimeVariables } from "../../../lib/mobileThemeVariables";
 import { FONT_FAMILIES, type FontFamilies } from "../../../lib/fontFamilies";
-import {
-  fontFamilyVariables,
-  PORTAL_FONT_FAMILIES,
-  usePortalTypefaceReady,
-} from "../../portal/portalTypeface";
 import type { MobileThemeVariables } from "../../../lib/mobileTheme";
 import {
   createMobileThemePairPatch,
@@ -224,13 +218,6 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
     systemColorPalettes,
   );
   const themeVariables = themeVariablesByAppearance[themeAppearance];
-  const fontFamilies = usePortalTypefaceReady(themeId === PORTAL_THEME_ID)
-    ? PORTAL_FONT_FAMILIES
-    : FONT_FAMILIES;
-  const scopedVariables =
-    fontFamilies === FONT_FAMILIES
-      ? themeVariables
-      : { ...themeVariables, ...fontFamilyVariables(fontFamilies) };
   const activeThemeName = getMobileUniwindThemeName(themeId, themeAppearance);
   const { baseFontSize, codeFontSize, codeWordBreak, terminalFontSize } = preferences;
   const appearance = useMemo(
@@ -320,7 +307,7 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       systemColorsAvailable: isSystemColorsAvailable,
       systemColorsActive,
       themeVariables,
-      fontFamilies,
+      fontFamilies: FONT_FAMILIES,
       themeVariablesByAppearance,
       systemColorPalettes,
       isReady,
@@ -344,7 +331,6 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       themeAppearance,
       systemColorsActive,
       themeVariables,
-      fontFamilies,
       themeVariablesByAppearance,
       systemColorPalettes,
       isReady,
@@ -363,7 +349,7 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
   return (
     <AppearancePreferencesContext.Provider value={value}>
       <ScopedTheme theme={activeThemeName}>
-        <ScopedVariables variables={scopedVariables}>{props.children}</ScopedVariables>
+        <ScopedVariables variables={themeVariables}>{props.children}</ScopedVariables>
       </ScopedTheme>
     </AppearancePreferencesContext.Provider>
   );

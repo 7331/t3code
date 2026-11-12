@@ -120,6 +120,7 @@ import {
   providerSectionIsCollapsed,
 } from "./thread-settings-sheet-state";
 import { formatProviderUpdateRequiredNotice } from "@t3tools/client-runtime/providerUpdateRequiredModels";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 
 const PRIMARY_PROVIDER_DRIVERS: ReadonlySet<string> = new Set([
   "claudeAgent",
@@ -936,6 +937,8 @@ function ThreadSettingsOptionsItem(props: {
 
 function ThreadSettingsMainContent(props: {
   readonly bottomInset: number;
+  /** The model search, which the phone shell draws as Portal's field atop the list. */
+  readonly search: AppBarSearch;
   readonly onOpenSubmenu: (submenu: ThreadSettingsSubmenuPage) => void;
 }) {
   const session = useThreadSettingsSession();
@@ -1055,6 +1058,7 @@ function ThreadSettingsMainContent(props: {
       }
       contentContainerStyle={{ paddingTop: 4 }}
       contentInsetAdjustmentBehavior="automatic"
+      ListHeaderComponent={<PortalListSearch search={props.search} className="px-4 pb-2 pt-2" />}
       data={listItems}
       estimatedItemSize={Platform.OS === "android" ? 56 : 48}
       extraData={animationsReady}
@@ -1284,6 +1288,7 @@ function ThreadSettingsModelsScreen() {
       <ScreenContent>
         <ThreadSettingsMainContent
           bottomInset={searchToolbarInset}
+          search={search}
           onOpenSubmenu={(submenu) => {
             const title =
               submenu.kind === "runtime"

@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/ui/AppText";
 import { useContentTopInset } from "../../components/ui/useBarInset";
 import { SymbolView } from "../../components/ui/AppSymbol";
+import { PortalTabSearchField } from "../portal/shell/PortalTabSearchField";
+import { usePortalPhoneShell } from "../portal/shell/usePortalPhoneShell";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { NativePrimaryColumnContext } from "../../native/v5-workspace-context";
 import { useNativeColumnLayoutMetrics } from "../../native/native-layout-metrics";
@@ -175,6 +177,8 @@ export function PullRequestsScreen(
   );
   const paneRole = usePaneRole();
   const sidebar = props.sidebar === true || (primaryColumn !== null && paneRole === "sidebar");
+  // The phone shell has no search in the bar; Portal keeps it at the top of the list.
+  const portalPhoneShell = usePortalPhoneShell();
   const selectedKey = props.selectedPullRequestKey ?? primaryColumn?.selectedPullRequestKey;
   const connectedKey = connectedTargets.map((target) => target.environmentId).join("\n");
   const entries = useMemo(
@@ -318,6 +322,11 @@ export function PullRequestsScreen(
         ListHeaderComponentStyle={{ zIndex: 1 }}
         ListHeaderComponent={
           <>
+            {portalPhoneShell ? (
+              <View className="px-4 pt-2">
+                <PortalTabSearchField tab="pullRequests" placeholder="Search pull requests" />
+              </View>
+            ) : null}
             <PullRequestListFilters sidebar={sidebar} filters={filters} />
             {result.data?.errors.length ? (
               <View key={JSON.stringify(targets)}>
@@ -386,7 +395,6 @@ export function PullRequestsScreen(
                       ? "Pull requests from the selected environments' projects appear here."
                       : "Add an environment in Settings to browse its pull requests.")
                 }
-                variant="plain"
               />
             </View>
           )

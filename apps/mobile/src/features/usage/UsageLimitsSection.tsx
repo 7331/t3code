@@ -283,7 +283,7 @@ export function ResetCredits(props: {
               className={
                 dense
                   ? "rounded-full bg-subtle-strong px-2.5 py-1 disabled:opacity-[0.45]"
-                  : "min-h-[44px] justify-center rounded-full bg-subtle-strong px-3 py-1.5 disabled:opacity-[0.45]"
+                  : "min-h-[44px] justify-center rounded-[10px] bg-subtle-strong px-3 py-1.5 disabled:opacity-[0.45]"
               }
             >
               <Text

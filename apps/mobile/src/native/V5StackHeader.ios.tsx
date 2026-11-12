@@ -7,6 +7,7 @@ import { isValidElement, useEffect, useRef } from "react";
 import { StyleSheet } from "react-native";
 import { KeyboardController, useKeyboardState } from "react-native-keyboard-controller";
 import { isDuoDevice } from "../lib/device-type";
+import { FONT_FAMILIES } from "../lib/fontFamilies";
 import { useMobileNavigationTheme } from "../lib/useMobileNavigationTheme";
 import { useDeviceType, useNativeLayoutMetrics } from "./native-layout-metrics";
 import { HeaderItemsWidthContext } from "./header-items-width";
@@ -333,9 +334,11 @@ export function V5StackHeader(props: {
       : (headerStyle?.backgroundColor ?? theme.colors.card),
     shadowColor: options.headerShadowVisible === false ? "transparent" : undefined,
     titleFontSize: titleStyle?.fontSize,
-    titleFontFamily: titleStyle?.fontFamily,
-    titleFontWeight: titleStyle?.fontWeight,
+    // Portal's typeface; its bold face carries the weight, so no synthetic weight is asked for.
+    titleFontFamily: titleStyle?.fontFamily ?? FONT_FAMILIES.bold,
+    titleFontWeight: titleStyle?.fontFamily === undefined ? undefined : titleStyle.fontWeight,
     titleFontColor: titleStyle?.color,
+    subtitleFontFamily: options.headerSubtitleStyle?.fontFamily ?? FONT_FAMILIES.regular,
     subtitleFontSize: options.headerSubtitleStyle?.fontSize,
     subtitleFontColor: options.headerSubtitleStyle?.color,
   };

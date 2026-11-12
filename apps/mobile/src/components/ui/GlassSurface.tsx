@@ -1,4 +1,3 @@
-import { GlassView, isGlassEffectAPIAvailable } from "expo-glass-effect";
 import type { ReactNode, Ref } from "react";
 import {
   Platform,
@@ -8,38 +7,25 @@ import {
   type ViewProps,
   type ViewStyle,
 } from "react-native";
-import { withUniwind } from "uniwind";
 
 import { MOBILE_SHAPE } from "../../lib/designTokens";
 import { cn } from "../../lib/cn";
 import { useAppearancePreferences } from "../../features/settings/appearance/AppearancePreferencesProvider";
 import { GlassBackdrop } from "./GlassBackdrop";
 
-// Explicit mappings keep the native glassEffectStyle enum out of style-array conversion.
-const ThemedGlassView = withUniwind(GlassView, {
-  style: { fromClassName: "className" },
-  tintColor: { fromClassName: "tintColorClassName", styleProperty: "accentColor" },
-});
-
 interface GlassSurfaceProps extends ViewProps {
   readonly ref?: Ref<ViewInstance>;
   readonly children: ReactNode;
-  readonly glassEffectStyle?: "clear" | "regular" | "none";
-  // null leaves UIKit's material untinted instead of applying the theme tint.
-  readonly tintColor?: ColorValue | null;
-  readonly tintColorClassName?: string;
   readonly chrome?: "default" | "none";
   readonly fallbackColor?: ColorValue;
   readonly fallbackClassName?: string;
 }
 
+/** A floating surface in Portal's look: solid fill, hairline border, soft shadow. Portal draws no glass. */
 export function GlassSurface({
   ref,
   children,
-  glassEffectStyle = "regular",
   chrome = "default",
-  tintColor,
-  tintColorClassName,
   fallbackColor,
   fallbackClassName,
   className,
@@ -48,10 +34,9 @@ export function GlassSurface({
 }: GlassSurfaceProps) {
   const { themeAppearance } = useAppearancePreferences();
   const isDarkMode = themeAppearance === "dark";
-  const supportsGlass = Platform.OS === "ios" && isGlassEffectAPIAvailable();
   const hasShadow = chrome !== "none" && Platform.OS !== "android";
   const surfaceStyle: ViewStyle = {
-    borderRadius: MOBILE_SHAPE.glass,
+    borderRadius: MOBILE_SHAPE.popup,
     overflow: "hidden",
     shadowColor: hasShadow ? "#000000" : "transparent",
     shadowOpacity: hasShadow ? (isDarkMode ? 0.22 : 0.08) : 0,
@@ -59,30 +44,6 @@ export function GlassSurface({
     shadowOffset: { width: 0, height: hasShadow ? 14 : 0 },
     elevation: hasShadow ? 12 : 0,
   };
-
-  if (supportsGlass) {
-    return (
-      <ThemedGlassView
-        {...props}
-        ref={ref}
-        className={cn(
-          chrome === "none"
-            ? "border-0 border-transparent bg-transparent"
-            : "border border-border bg-glass-surface",
-          className,
-        )}
-        glassEffectStyle={glassEffectStyle}
-        tintColor={tintColor == null ? undefined : String(tintColor)}
-        tintColorClassName={
-          tintColorClassName ?? (tintColor === undefined ? "accent-glass-tint" : undefined)
-        }
-        colorScheme={isDarkMode ? "dark" : "light"}
-        style={[surfaceStyle, style]}
-      >
-        {children}
-      </ThemedGlassView>
-    );
-  }
 
   return (
     <View

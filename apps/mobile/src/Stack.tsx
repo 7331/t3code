@@ -292,7 +292,7 @@ const SETTINGS_SCREENS = {
     linking: "settings/scheduled-tasks",
     options: {
       ...settingsPage("Scheduled tasks"),
-      headerTitleStyle: { fontSize: 16, fontWeight: "800" },
+      headerTitleStyle: { fontSize: 16 },
     },
   }),
   SettingsScheduledTaskNew: createNativeStackScreen({
@@ -439,9 +439,10 @@ function NotFoundScreen() {
   const primaryBgStyle = StyleSheet.flatten(useResolveClassNames("bg-primary"));
   const returnHomeButtonStyle = StyleSheet.flatten([
     {
-      borderRadius: 999,
-      paddingHorizontal: 20,
-      paddingVertical: 14,
+      borderRadius: 10,
+      minHeight: 44,
+      justifyContent: "center",
+      paddingHorizontal: 16,
     },
     primaryBgStyle,
   ]);
@@ -466,7 +467,7 @@ function NotFoundScreen() {
         style={returnHomeButtonStyle}
         onPress={() => navigation.dispatch(StackActions.replace("Home"))}
       >
-        <Text className="text-base font-t3-bold text-primary-foreground">Return home</Text>
+        <Text className="text-[15px] font-t3-medium text-primary-foreground">Return home</Text>
       </Pressable>
     </ScrollView>
   );

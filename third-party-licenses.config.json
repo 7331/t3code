@@ -135,11 +135,11 @@
     },
     {
       "bundles": ["assets", "mobile"],
-      "license": "Ubuntu-font-1.0",
-      "name": "Ubuntu font family",
-      "noticeFile": "apps/mobile/src/features/portal/fonts/LICENSE",
-      "sourceUrl": "https://assets.ubuntu.com/v1/0cef8205-ubuntu-font-family-0.83.zip",
-      "version": "0.83"
+      "license": "OFL-1.1",
+      "name": "Fluxer Sans and Fluxer Mono (IBM Plex)",
+      "noticeFile": "apps/mobile/assets/fonts/LICENSE-OFL.txt",
+      "sourceUrl": "https://github.com/fluxerapp/fluxer/tree/main/packages/fonts",
+      "version": "3.005"
     },
     {
       "bundles": ["assets", "web"],

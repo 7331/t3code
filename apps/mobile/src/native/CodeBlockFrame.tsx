@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { SymbolView, type AppSymbolName } from "../components/ui/AppSymbol";
 import { themeColorWithAlpha } from "../lib/mobileTheme";
 import type { NativeMarkdownTextStyle } from "./SelectableMarkdownText.types";
 
 /**
- * The native code block's border and header, for a fence drawn in React once it closes.
+ * The native code block's border and top band, for a fence drawn in React once it closes. As in
+ * Portal, the band holds only the block's actions, in its corner: no language label or divider.
  * The block slot already applies the code block's outer margins.
  */
 export function CodeBlockFrame(props: {
-  readonly label: string;
   readonly textStyle: NativeMarkdownTextStyle;
   readonly actions: ReactNode;
   readonly children: ReactNode;
@@ -26,25 +26,7 @@ export function CodeBlockFrame(props: {
         },
       ]}
     >
-      <View
-        style={[
-          styles.header,
-          { borderBottomColor: themeColorWithAlpha(textStyle.codeColor, 0.2) },
-        ]}
-      >
-        <Text
-          style={[
-            styles.label,
-            {
-              color: themeColorWithAlpha(textStyle.codeColor, 0.6),
-              fontSize: textStyle.fontSize * 0.9 * 0.85,
-            },
-          ]}
-        >
-          {props.label}
-        </Text>
-        <View style={styles.actions}>{props.actions}</View>
-      </View>
+      <View style={styles.band}>{props.actions}</View>
       {props.children}
     </View>
   );
@@ -80,14 +62,12 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
-  header: {
+  band: {
     minHeight: 32,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    justifyContent: "flex-end",
+    gap: 14,
   },
-  label: { fontWeight: "500" },
-  actions: { flexDirection: "row", alignItems: "center", gap: 14 },
 });

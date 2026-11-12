@@ -218,7 +218,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
       pointerEvents={props.collapsed ? "none" : "auto"}
       accessibilityElementsHidden={props.collapsed}
       importantForAccessibility={props.collapsed ? "no-hide-descendants" : "auto"}
-      className="overflow-hidden gap-2.5 rounded-[20px] border border-border bg-card-alt p-4"
+      className="overflow-hidden gap-2.5 rounded-2xl border border-border bg-card-alt p-4"
       style={cardAnimatedStyle}
     >
       <Pressable

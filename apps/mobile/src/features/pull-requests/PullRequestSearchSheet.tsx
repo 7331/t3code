@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBar } from "../../components/ui/AppBar";
 import type { AppBarSearch } from "../../components/ui/AppBar.types";
 import { useSearchToolbarInset } from "../../components/ui/useBarInset";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 
 /** A searchable picker over a pull request list or a pull request. */
 export function PullRequestSearchSheet(props: {
@@ -15,8 +16,14 @@ export function PullRequestSearchSheet(props: {
   readonly clearAccessibilityLabel: string;
   readonly query: string;
   readonly onQueryChange: (query: string) => void;
-  /** Renders the list, given the bottom padding that keeps its end clear of the search bar. */
-  readonly children: (list: { readonly paddingBottom: number }) => ReactNode;
+  /**
+   * Renders the list, given the bottom padding that keeps its end clear of the search bar and
+   * the header the list draws first: Portal's search field on the phone, else nothing.
+   */
+  readonly children: (list: {
+    readonly paddingBottom: number;
+    readonly header: ReactNode;
+  }) => ReactNode;
 }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -42,6 +49,7 @@ export function PullRequestSearchSheet(props: {
       {props.children({
         // Android's bottom inset also covers the floating workspace tabs while Settings is open.
         paddingBottom: Platform.OS === "android" ? insets.bottom + 16 : searchToolbarInset + 16,
+        header: <PortalListSearch search={search} />,
       })}
     </View>
   );

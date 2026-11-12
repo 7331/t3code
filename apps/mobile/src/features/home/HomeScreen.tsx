@@ -722,7 +722,6 @@ export function HomeScreen(props: HomeScreenProps) {
               />
             ) : undefined
           }
-          variant="plain"
         />
         {emptyState.loading ? (
           <View className="mt-4 items-center">
@@ -769,7 +768,6 @@ export function HomeScreen(props: HomeScreenProps) {
       {listHeader}
       {Platform.OS === "ios" && workspace ? (
         <ThreadListFilters
-          gutter={sidebarSurface ? 8 : 0}
           environments={props.environments}
           projects={pickableProjectGroups(projectScopes).map((scope) => ({
             key: scope.key,
@@ -789,32 +787,21 @@ export function HomeScreen(props: HomeScreenProps) {
       <EmptyState
         title="Searching thread messages…"
         detail={`Looking for "${props.searchQuery}" in messages.`}
-        variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : hasSearchQuery ? (
-      <EmptyState
-        title="No results"
-        detail={`No threads matching "${props.searchQuery}".`}
-        variant={Platform.OS === "android" ? "plain" : undefined}
-      />
+      <EmptyState title="No results" detail={`No threads matching "${props.searchQuery}".`} />
     ) : v2ScopedProjectGroup !== null ? (
       <EmptyState
         title={`No threads in ${v2ScopedProjectGroup.title}`}
         detail="Choose another project or create a new task."
-        variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : selectedEnvironmentLabel ? (
       <EmptyState
         title={`No threads in ${selectedEnvironmentLabel}`}
         detail="Choose another environment or create a new task."
-        variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : (
-      <EmptyState
-        title="No threads yet"
-        detail="Create a task to start a new coding session."
-        variant={Platform.OS === "android" ? "plain" : undefined}
-      />
+      <EmptyState title="No threads yet" detail="Create a task to start a new coding session." />
     );
 
   if (Platform.OS === "android" && threadListV2Items.length === 0) {

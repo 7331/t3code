@@ -55,7 +55,7 @@ export function SettingsVoiceModelsRouteScreen({
       query={query}
       onQueryChange={setQuery}
     >
-      {({ paddingBottom }) => (
+      {({ paddingBottom, header }) => (
         <LegendList
           renderScrollComponent={NativeScrollView}
           data={models}
@@ -71,11 +71,14 @@ export function SettingsVoiceModelsRouteScreen({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom }}
           ListHeaderComponent={
-            voice.canManage ? undefined : (
-              <Text className="pb-3 text-xs text-foreground-muted">
-                This connection can’t change settings on {label}.
-              </Text>
-            )
+            <>
+              {header}
+              {voice.canManage ? null : (
+                <Text className="pb-3 text-xs text-foreground-muted">
+                  This connection can’t change settings on {label}.
+                </Text>
+              )}
+            </>
           }
           renderItem={({ item, index }) => (
             <View
@@ -97,7 +100,6 @@ export function SettingsVoiceModelsRouteScreen({
                 detail={
                   needle ? "Try another name or language." : `${label} has no models to list.`
                 }
-                variant="plain"
               />
             )
           }

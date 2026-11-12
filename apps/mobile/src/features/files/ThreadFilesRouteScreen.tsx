@@ -596,6 +596,7 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
           isPending={entriesQuery.isPending}
           isRefreshing={entriesQuery.isRefreshing}
           searchQuery={searchQuery}
+          search={{ value: searchQuery, onChangeText: setSearchQuery, placeholder: "Search files" }}
           searchResultPaths={entriesQuery.searchResultPaths}
           searchTruncated={entriesQuery.searchTruncated}
           selectedPath={entriesQuery.selectedPath}
@@ -1000,6 +1001,11 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
             isPending={entriesQuery.isPending}
             isRefreshing={entriesQuery.isRefreshing}
             searchQuery={searchQuery}
+            search={{
+              value: searchQuery,
+              onChangeText: setSearchQuery,
+              placeholder: "Search files",
+            }}
             searchResultPaths={entriesQuery.searchResultPaths}
             searchTruncated={entriesQuery.searchTruncated}
             selectedPath={entriesQuery.selectedPath}

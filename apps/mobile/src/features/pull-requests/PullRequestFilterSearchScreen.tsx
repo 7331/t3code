@@ -122,9 +122,10 @@ export function PullRequestFilterSearchScreen({
       query={query}
       onQueryChange={setQuery}
     >
-      {({ paddingBottom }) => (
+      {({ paddingBottom, header }) => (
         <LegendList
           renderScrollComponent={NativeScrollView}
+          ListHeaderComponent={<>{header}</>}
           data={rows}
           keyExtractor={(value) => value.toLowerCase()}
           extraData={{ selected, colors, count: rows.length }}
@@ -171,7 +172,6 @@ export function PullRequestFilterSearchScreen({
                       ? "Search the labels of the repositories this list covers."
                       : "Search people by name or handle on the repositories' hosts."
                 }
-                variant="plain"
               />
             )
           }

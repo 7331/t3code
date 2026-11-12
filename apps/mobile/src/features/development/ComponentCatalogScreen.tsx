@@ -86,7 +86,6 @@ export function ComponentCatalogScreen() {
             ]}
             selected={appearance.themeAppearance}
             onSelect={appearance.setThemeMode}
-            size="compact"
           />
         </View>
         <SegmentedControl
@@ -97,7 +96,6 @@ export function ComponentCatalogScreen() {
           ]}
           selected={page}
           onSelect={setPage}
-          size="compact"
         />
         {page === "controls" ? (
           <>
@@ -105,14 +103,7 @@ export function ComponentCatalogScreen() {
               <AppText className="text-lg font-t3-semibold">Lists and selection</AppText>
               <ListSection>
                 <View className="p-4">
-                  <SegmentedControl
-                    variant="card"
-                    options={CHOICES}
-                    selected={tab}
-                    onSelect={setTab}
-                    size="compact"
-                    role="tab"
-                  />
+                  <SegmentedControl options={CHOICES} selected={tab} onSelect={setTab} role="tab" />
                 </View>
                 <ListRow icon="folder" label="Projects" detail="4" onPress={() => setSheet(true)} />
                 <ListToggleRow
@@ -130,13 +121,7 @@ export function ComponentCatalogScreen() {
                   onPress={confirm}
                 />
               </ListSection>
-              <SegmentedControl
-                options={CHOICES}
-                selected={tab}
-                onSelect={setTab}
-                size="compact"
-                role="tab"
-              />
+              <SegmentedControl options={CHOICES} selected={tab} onSelect={setTab} role="tab" />
               <View className="flex-row flex-wrap gap-2">
                 <Chip
                   label="Selected filter"

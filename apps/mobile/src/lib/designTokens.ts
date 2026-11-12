@@ -1,7 +1,12 @@
 export const MOBILE_SHAPE = {
-  group: { ios: 24, android: 28 },
-  toast: 26,
-  glass: 32,
+  // Portal's `--radius-card`.
+  group: 16,
+  // Portal's toast is a card too.
+  toast: 16,
+  // Portal's `--radius-popup`: floating surfaces such as popovers and the device bar.
+  popup: 20,
+  // Portal's `--radius-composer` on a phone.
+  composer: 16,
 } as const;
 
 export const MOBILE_MOTION = {

@@ -1,5 +1,6 @@
 import { isDraftThreadRoute } from "./thread-route-state";
 import * as Dialog from "../../components/ui/Dialog";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { AppBar } from "../../components/ui/AppBar";
@@ -351,9 +352,17 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               : {}),
           }}
         >
+          <PortalListSearch
+            search={{
+              value: searchText,
+              onChangeText: setSearchText,
+              placeholder: "Search projects",
+            }}
+            className=""
+          />
           {scratchOption !== null && listScopes.length > 0 ? (
             Platform.OS === "android" ? (
-              <View collapsable={false} className="overflow-hidden rounded-[28px] bg-grouped-card">
+              <View collapsable={false} className="overflow-hidden rounded-2xl bg-grouped-card">
                 <NavigationRow
                   className="bg-grouped-card"
                   title="No project"
@@ -371,7 +380,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 />
               </View>
             ) : (
-              <View collapsable={false} className="overflow-hidden rounded-[24px] bg-grouped-card">
+              <View collapsable={false} className="overflow-hidden rounded-2xl bg-grouped-card">
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="No project"
@@ -411,7 +420,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               collapsable={false}
               className={cn(
                 "items-center gap-3 px-6 py-8",
-                Platform.OS !== "android" && "rounded-[24px] bg-grouped-card",
+                Platform.OS !== "android" && "rounded-2xl bg-grouped-card",
               )}
             >
               {projectEmptyState.loading ? (
@@ -491,8 +500,8 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               collapsable={false}
               className={
                 Platform.OS === "android"
-                  ? "overflow-hidden rounded-[28px] bg-grouped-card"
-                  : "overflow-hidden rounded-[24px] bg-grouped-card"
+                  ? "overflow-hidden rounded-2xl bg-grouped-card"
+                  : "overflow-hidden rounded-2xl bg-grouped-card"
               }
             >
               {visibleScopes.map((scope, scopeIndex) => {

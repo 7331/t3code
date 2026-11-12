@@ -11,7 +11,6 @@ export function WorkspaceNoTabs() {
         title="All sections are hidden"
         detail="Show a section to add it back to navigation."
         actionLabel="Edit navigation tabs"
-        variant="plain"
         onAction={() => openSettings(navigation, "SettingsNavigation")}
       />
     </View>

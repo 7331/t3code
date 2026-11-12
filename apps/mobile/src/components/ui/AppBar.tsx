@@ -77,8 +77,8 @@ export function AppBar(props: AppBarProps) {
   const { themeVariables } = useAppearancePreferences();
   const { colors } = useControlTheme();
   const usesNativeMailSearchToolbar = useNativeMailSearchToolbar();
-  // Portal keeps a list's search field at the top of the list, never in a capsule floating
-  // over its end, so the phone shell stacks it under the title instead of the mail toolbar.
+  // Portal keeps a list's search field at the top of the list as a filled field, never in a
+  // glass capsule, so in the phone shell the page draws `PortalListSearch` and the bar has none.
   const portalPhoneShell = usePortalPhoneShell();
   const { search, menus } = props;
   const menu = menus?.[0];
@@ -113,7 +113,7 @@ export function AppBar(props: AppBarProps) {
           ...(props.matchSearchSurface
             ? { contentStyle: { backgroundColor: themeVariables["--color-sheet-solid"] } }
             : undefined),
-          ...(search
+          ...(search && !portalPhoneShell
             ? {
                 unstable_headerToolbarItems: compactSearch
                   ? () => [
@@ -135,14 +135,11 @@ export function AppBar(props: AppBarProps) {
                 headerSearchBarOptions: compactSearch
                   ? undefined
                   : {
-                      allowToolbarIntegration: !portalPhoneShell,
-                      ...(portalPhoneShell
-                        ? { placement: "stacked" as const, hideWhenScrolling: false }
-                        : duoBottomSearch
-                          ? { placement: "integrated" as const }
-                          : NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED && search.mode === "inline"
-                            ? { placement: "integratedButton" as const }
-                            : undefined),
+                      ...(duoBottomSearch
+                        ? { placement: "integrated" as const }
+                        : NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED && search.mode === "inline"
+                          ? { placement: "integratedButton" as const }
+                          : undefined),
                       autoCapitalize: "none",
                       hideNavigationBar: false,
                       ...(search.mode === "inline" || duoBottomSearch

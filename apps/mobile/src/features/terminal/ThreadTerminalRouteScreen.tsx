@@ -1041,8 +1041,6 @@ function ThreadTerminal(props: {
                   <GlassSurface
                     chrome="none"
                     fallbackColor={terminalTheme.background}
-                    glassEffectStyle="regular"
-                    tintColor="transparent"
                     style={{
                       alignItems: "center",
                       borderRadius: 24,

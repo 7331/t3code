@@ -233,7 +233,7 @@ function BrowserAddressBar({
         returnKeyType="go"
         selectTextOnFocus
         lineBreakModeIOS="tail"
-        className="h-10 min-w-0 flex-1 rounded-full border border-input-border bg-input px-4 font-sans text-sm text-foreground"
+        className="h-11 min-w-0 flex-1 rounded-[10px] border border-input-border bg-input px-3 font-sans text-[15px] text-foreground"
       />
       <ControlPill
         icon="arrow.clockwise"

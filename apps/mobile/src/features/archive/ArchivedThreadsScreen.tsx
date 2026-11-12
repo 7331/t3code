@@ -31,6 +31,7 @@ import { useEnvironmentScope } from "../../state/session";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import type { ArchivedThreadGroup, ArchivedThreadSortOrder } from "./archivedThreadList";
 import { SettingsScreenContent } from "../settings/components/SettingsScreen";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 
 export interface ArchivedThreadsHeaderEnvironment {
   readonly environmentId: EnvironmentId;
@@ -67,7 +68,7 @@ function ArchivedThreadsHeader(props: {
           title: "Archived thread options",
           icon: hasCustomFilter
             ? "line.3.horizontal.decrease.circle.fill"
-            : "line.3.horizontal.decrease.circle",
+            : "line.3.horizontal.decrease",
           items: [
             {
               id: "environment",
@@ -270,7 +271,7 @@ function ArchivedThreadRow(props: {
 
 function ArchiveError(props: { readonly message: string; readonly onRetry: () => void }) {
   return (
-    <View className="rounded-[20px] border border-danger-border bg-danger p-4">
+    <View className="rounded-2xl border border-danger-border bg-danger p-4">
       <Text className="text-base font-t3-bold text-danger-foreground">
         Could not load every archive
       </Text>
@@ -430,7 +431,18 @@ export function ArchivedThreadsScreen(props: {
             keyExtractor={(item) => item.key}
             ListEmptyComponent={listEmptyComponent}
             ListHeaderComponent={
-              props.error ? <ArchiveError message={props.error} onRetry={props.onRefresh} /> : null
+              <>
+                <PortalListSearch
+                  search={{
+                    value: props.searchQuery,
+                    onChangeText: props.onSearchQueryChange,
+                    placeholder: "Search archived threads",
+                  }}
+                />
+                {props.error ? (
+                  <ArchiveError message={props.error} onRetry={props.onRefresh} />
+                ) : null}
+              </>
             }
             onScrollBeginDrag={() => openSwipeableRef.current?.close()}
             refreshControl={

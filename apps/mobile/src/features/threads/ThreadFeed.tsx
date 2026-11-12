@@ -897,7 +897,7 @@ function UserMessageMedia(props: {
   ];
   return collage ? (
     <View
-      className="overflow-hidden rounded-[20px] bg-border"
+      className="overflow-hidden rounded-2xl bg-border"
       style={{ width: 320, maxWidth: "100%", alignSelf: "flex-end", gap: StyleSheet.hairlineWidth }}
     >
       {media.length === 3 ? (
@@ -922,20 +922,20 @@ function UserMessageMedia(props: {
             </View>
           ))
       )}
-      <View pointerEvents="none" className="absolute inset-0 rounded-[20px] border border-border" />
+      <View pointerEvents="none" className="absolute inset-0 rounded-2xl border border-border" />
     </View>
   ) : (
     <View className="items-end gap-2">
       {media.map((item) => (
         <View
           key={item.id}
-          className="overflow-hidden rounded-[20px]"
+          className="overflow-hidden rounded-2xl"
           style={{ width: item.image ? undefined : 320, maxWidth: "100%" }}
         >
           {item.content}
           <View
             pointerEvents="none"
-            className="absolute inset-0 rounded-[20px] border border-border"
+            className="absolute inset-0 rounded-2xl border border-border"
           />
         </View>
       ))}
@@ -1015,7 +1015,7 @@ function MessageAttachmentList(props: {
         attachmentId={attachment.id}
         name={attachment.name}
         mimeType={attachment.mimeType}
-        className="mt-1.5 aspect-[1.3] w-full rounded-[18px] bg-subtle-strong"
+        className="mt-1.5 aspect-[1.3] w-full rounded-2xl bg-subtle-strong"
         onPressPreview={props.onPressPreview}
       />
     ) : isFileAttachment(attachment) ? (

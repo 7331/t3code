@@ -18,7 +18,6 @@ import { Linking, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "../../lib/cn";
-import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../components/ui/AppText";
@@ -86,8 +85,6 @@ function PairingForm({
   const [scannerLocked, setScannerLocked] = useState(false);
   // A good scan parks the camera so it can't re-read the code over later edits.
   const [scanComplete, setScanComplete] = useState(false);
-
-  const headerIconColor = useUniwindTheme()["--color-icon"];
 
   const connectDisabled = connecting || hostInput.trim().length === 0;
 
@@ -178,18 +175,14 @@ function PairingForm({
   return (
     <SettingsScreen
       title="Add environment"
-      actions={[
-        {
-          accessibilityLabel: connecting ? "Connecting" : "Add environment",
-          loading: connecting,
-          icon: "checkmark",
-          tintColor: headerIconColor,
-          disabled: connectDisabled,
-          onPress: () => {
-            void handleSubmit();
-          },
+      confirm={{
+        label: "Add",
+        loading: connecting,
+        disabled: connectDisabled,
+        onPress: () => {
+          void handleSubmit();
         },
-      ]}
+      }}
     >
       <ScrollView
         nestedScrollEnabled
@@ -217,7 +210,7 @@ function PairingForm({
             <View
               collapsable={false}
               className={cn(
-                "overflow-hidden rounded-[26px] border-continuous border bg-grouped-card",
+                "overflow-hidden rounded-2xl border-continuous border bg-grouped-card",
                 pairingConnectionError ? "border-danger-foreground" : "border-transparent",
               )}
             >
@@ -277,7 +270,7 @@ function PairingScanCard(props: {
       disabled={props.cameraActive}
       onPress={props.onScanPress}
       className={cn(
-        "overflow-hidden rounded-[26px] border-continuous",
+        "overflow-hidden rounded-2xl border-continuous",
         light ? "bg-white" : "bg-black",
       )}
       style={{ height: SCAN_CARD_HEIGHT }}

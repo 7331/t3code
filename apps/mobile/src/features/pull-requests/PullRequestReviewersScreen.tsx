@@ -27,6 +27,7 @@ import { useDebouncedValue } from "../../state/queries";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { PullRequestAvatar } from "./PullRequestPresentation";
 import { pullRequestTarget, type PullRequestParams } from "./usePullRequestDiff";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 
 const TRUNCATED_LABELS: Record<ReviewerTruncation, (error: string | null) => string> = {
   unsearchable: () =>
@@ -166,6 +167,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
           contentContainerStyle={{ paddingBottom: 24 + searchToolbarInset }}
           ListHeaderComponent={
             <View className="gap-3 px-4 py-4">
+              <PortalListSearch search={reviewerSearch} className="" />
               <Text className="text-xs text-foreground-muted">
                 Tap someone to request a review. Tap a requested reviewer to remove the request.
               </Text>
@@ -229,7 +231,6 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                         : "No reviewers available"
                   }
                   detail={queryError ?? "Search people and teams with access to this repository."}
-                  variant="plain"
                 />
                 {queryError ? (
                   <Button

@@ -33,7 +33,6 @@ export function WorkspaceEmptyDetail(props: {
                 <EmptyState
                   title="No environments connected"
                   detail="Add an environment to load projects and start coding sessions."
-                  variant="plain"
                   action={
                     <FloatingActionButton
                       label="Add environment"
@@ -77,7 +76,7 @@ export function WorkspaceEmptyDetail(props: {
                   ) : (
                     <Pressable
                       accessibilityRole="button"
-                      className="mt-2 flex-row items-center gap-2 rounded-full bg-primary px-5 py-3 active:opacity-70"
+                      className="mt-2 min-h-11 flex-row items-center gap-2 rounded-[10px] bg-primary px-4 active:opacity-70"
                       onPress={props.onStartNewTask}
                     >
                       <Text className="text-base font-t3-bold text-primary-foreground">

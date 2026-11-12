@@ -25,7 +25,7 @@ import {
 import { useSelectWorkspaceTab } from "../../layout/workspace/useSelectWorkspaceTab";
 import { useWorkspaceTabs } from "../../layout/workspace/WorkspaceTabsContext";
 import { openSettings } from "../../settings/settings-navigation";
-import { portalDrawer, usePortalDrawerOpen } from "./portalDrawerStore";
+import { portalDrawer, portalDrawerSearchRef, usePortalDrawerOpen } from "./portalDrawerStore";
 import { usePortalPhoneShell } from "./usePortalPhoneShell";
 
 /** Routes that are the workspace root itself; anything pushed above them closes the drawer. */
@@ -150,17 +150,18 @@ export function PortalWorkspaceDrawer() {
                 />
               </Pressable>
             </View>
-            <View className="h-9 flex-row items-center gap-2 rounded-[10px] bg-subtle px-3">
+            <View className="h-11 flex-row items-center gap-2 rounded-[10px] border border-input-border bg-input px-3">
               <SymbolView
                 name="magnifyingglass"
-                size={14}
+                size={16}
                 tintColorClassName="accent-foreground-muted"
               />
               <TextInput
+                ref={portalDrawerSearchRef}
                 accessibilityLabel="Search threads"
                 autoCapitalize="none"
                 autoCorrect={false}
-                className="min-w-0 flex-1 font-sans text-sm text-foreground"
+                className="min-w-0 flex-1 font-sans text-base text-foreground"
                 onChangeText={(text) =>
                   workspace?.dispatch({ type: "query", query: text, tab: "threads" })
                 }
@@ -181,7 +182,11 @@ export function PortalWorkspaceDrawer() {
             </SafeAreaInsetsContext>
           </View>
         </View>
-        <View className="gap-1 px-3 pb-2 pt-2">
+        {/* The thread list scrolls in its own region and ends at this hairline, not under the links. */}
+        <View
+          className="gap-1 border-separator px-3 pb-2 pt-2"
+          style={{ borderTopWidth: StyleSheet.hairlineWidth }}
+        >
           {destinations.map((destination) => (
             <Pressable
               key={destination.key}

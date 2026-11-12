@@ -78,6 +78,7 @@ import {
 } from "../../components/ComposerAttachmentStrip";
 import { VideoPreviewModal, type VideoPreviewSource } from "../../components/ui/VideoPreviewModal";
 import { GlassSurface } from "../../components/ui/GlassSurface";
+import { MOBILE_SHAPE } from "../../lib/designTokens";
 import { ComposerEditor, type ComposerEditorHandle } from "../../components/ComposerEditor";
 import { fileRoutePathSegments } from "../files/filePath";
 import { ComposerActionButton, ComposerToolbarRow } from "../../components/ComposerToolbar";
@@ -393,9 +394,7 @@ function ComposerSurface(props: {
         chrome="none"
         fallbackColor={colors["--color-composer-surface"]}
         fallbackClassName="border border-composer-border"
-        glassEffectStyle="regular"
         pointerEvents="none"
-        tintColor="transparent"
         layout={layoutTransition}
         style={[{ position: "absolute", inset: 0 }, animatedShapeStyle]}
       >
@@ -887,7 +886,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         <ComposerSurface
           animateLayout={false}
           style={{
-            borderRadius: usesLargeControls ? 31 : 27,
+            borderRadius: MOBILE_SHAPE.composer,
             borderCurve: "circular",
             overflow: "hidden",
             paddingVertical: surfacePaddingVertical,

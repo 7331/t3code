@@ -65,11 +65,7 @@ export function PullRequestCompletionSuggestions({
   if (completions.kind === null) return null;
   const copy = COPY[completions.kind];
   return (
-    <GlassSurface
-      glassEffectStyle="clear"
-      tintColorClassName="accent-glass-surface"
-      style={{ borderRadius: 16, overflow: "hidden" }}
-    >
+    <GlassSurface style={{ borderRadius: 16, overflow: "hidden" }}>
       {completions.candidates.length > 0 ? (
         <ScrollView
           className="max-h-[180px]"

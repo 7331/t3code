@@ -3,11 +3,10 @@ import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScroll
 import Constants from "expo-constants";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppText as Text } from "../../components/ui/AppText";
-import { SymbolView } from "../../components/ui/AppSymbol";
+import { ListRowLayout } from "../../components/ui/ListRowLayout";
 import { useDeadlinePassed } from "../../lib/clock";
 import {
   type AppUpdateCheckState,
@@ -99,23 +98,14 @@ function AppSettingsSection() {
               ? "Up to date"
               : null;
 
+  // The same row as its neighbours, so the version reads at their size.
   const versionRow = (
-    <View className="flex-row items-center gap-4 p-4">
-      <SymbolView
-        name="info.circle"
-        size={22}
-        tintColorClassName="accent-icon"
-        type="monochrome"
-        weight="regular"
-      />
-      <Text className="flex-1 text-lg text-foreground">Version</Text>
-      <View className="items-end">
-        <Text className="text-lg text-foreground-muted">{versionLabel}</Text>
-        {statusLabel ? (
-          <Text className="text-xs text-foreground-muted/70">{statusLabel}</Text>
-        ) : null}
-      </View>
-    </View>
+    <ListRowLayout
+      icon="info.circle"
+      label="Version"
+      detail={versionLabel}
+      description={statusLabel ?? undefined}
+    />
   );
 
   return (

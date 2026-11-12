@@ -239,7 +239,6 @@ function UsageScreen(props: {
                   options={WINDOW_OPTIONS}
                   selected={windowDays}
                   onSelect={selectWindow}
-                  size="compact"
                   className="flex-1"
                 />
               )}
@@ -247,7 +246,6 @@ function UsageScreen(props: {
                 options={VIEW_OPTIONS}
                 selected={view}
                 onSelect={setView}
-                size="compact"
                 role="tab"
                 className="flex-1"
               />
@@ -279,7 +277,6 @@ function UsageScreen(props: {
                     options={WINDOW_OPTIONS}
                     selected={windowDays}
                     onSelect={selectWindow}
-                    size="compact"
                   />
                 )}
                 <ChatGptUsageSummary selectedEnvironmentIds={selectedEnvironmentIds} />
@@ -322,7 +319,7 @@ function UsageScreen(props: {
                       {wide ? (
                         <View className="flex-row gap-6">
                           <View className="w-72 gap-6">
-                            <View className="rounded-[24px] border-continuous bg-grouped-card p-4">
+                            <View className="rounded-2xl border-continuous bg-grouped-card p-4">
                               <UsageSummary merged={merged} metric={metric} />
                             </View>
                             {providers}
@@ -431,7 +428,7 @@ function ChartCard(props: {
 
   return (
     <View
-      className={`gap-4 rounded-[24px] border-continuous bg-grouped-card p-4${props.fill ? " flex-1" : ""}`}
+      className={`gap-4 rounded-2xl border-continuous bg-grouped-card p-4${props.fill ? " flex-1" : ""}`}
     >
       {props.title ? (
         <Text className="text-sm font-t3-medium text-foreground">{props.title}</Text>

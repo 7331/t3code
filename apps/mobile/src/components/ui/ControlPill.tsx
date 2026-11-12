@@ -54,8 +54,8 @@ export function ControlPill(props: {
     isCircle
       ? "h-11 w-11 items-center justify-center rounded-full"
       : variant === "primary"
-        ? "h-11 flex-row items-center justify-center gap-2 rounded-full px-5"
-        : "h-11 flex-row items-center justify-center gap-2 rounded-full px-3.5",
+        ? "h-11 flex-row items-center justify-center gap-2 rounded-[10px] px-4"
+        : "h-11 flex-row items-center justify-center gap-2 rounded-[10px] px-3",
     variant === "primary"
       ? props.disabled
         ? "bg-subtle-strong"
@@ -66,7 +66,7 @@ export function ControlPill(props: {
     props.className,
   );
   const labelClassName = cn(
-    "text-center text-xs font-t3-bold",
+    "text-center text-sm font-t3-medium",
     variant === "primary"
       ? props.disabled
         ? "text-foreground-muted"

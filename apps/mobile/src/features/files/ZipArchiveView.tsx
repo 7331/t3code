@@ -359,7 +359,6 @@ function ZipArchiveFailure(props: {
   return (
     <View className="flex-1 items-center justify-center bg-sheet px-6">
       <EmptyState
-        variant="plain"
         title={props.failure.title}
         detail={props.failure.detail}
         action={
@@ -455,13 +454,12 @@ function ZipArchiveList(props: {
         ListEmptyComponent={
           query ? (
             <EmptyState
-              variant="plain"
               title={`No files match “${query.trim()}”`}
               detail="The filter checks file names and folder paths."
               action={<Button label="Clear filter" onPress={() => setQuery("")} />}
             />
           ) : (
-            <EmptyState variant="plain" title="This ZIP is empty" detail="It has no files." />
+            <EmptyState title="This ZIP is empty" detail="It has no files." />
           )
         }
       />
@@ -758,7 +756,6 @@ function ZipEntryView(props: {
       {content.status === "failed" ? (
         <ScrollView contentContainerClassName="flex-grow items-center justify-center px-6">
           <EmptyState
-            variant="plain"
             title={content.title}
             detail={content.message}
             action={

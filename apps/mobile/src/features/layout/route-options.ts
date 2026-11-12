@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 
 import { GLASS_HEADER_OPTIONS, type AppScreenOptions } from "../../native/glass-header-options";
 import { formSheetDetents } from "../../native/sheet-surface";
+import { MOBILE_SHAPE } from "../../lib/designTokens";
 
 /**
  * Route presets for the root stack. A route says what it is (a page, a sheet, a modal); the
@@ -19,7 +20,7 @@ const SOLID_HEADER_OPTIONS: AppScreenOptions = {
   headerLargeTitle: false,
   headerShadowVisible: false,
   headerShown: true,
-  headerTitleStyle: { fontSize: 18, fontWeight: "800" },
+  headerTitleStyle: { fontSize: 18 },
   headerTransparent: false,
 };
 
@@ -119,7 +120,8 @@ export function sheetRoute(options: SheetRouteOptions): AppScreenOptions {
     sheetGrabberVisible: true,
     sheetAllowedDetents:
       Platform.OS === "android" && options.androidFit ? "fitToContents" : sheetDetents(options),
-    ...(Platform.OS === "android" ? { sheetCornerRadius: 28 } : undefined),
+    // Portal's phone sheet: `rounded-t-card`.
+    sheetCornerRadius: MOBILE_SHAPE.group,
     ...(options.spansRail ? { nativeContentInsetHorizontally: false } : undefined),
   } as AppScreenOptions;
 }
