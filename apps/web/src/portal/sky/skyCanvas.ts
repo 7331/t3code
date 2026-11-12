@@ -1,6 +1,8 @@
-import { createBrowserSkyHost, SkyClock } from "./skyClock";
-import { sowStars, starFrame, type Star } from "./starField";
-import { windRows } from "./windField";
+import { SkyClock } from "@t3tools/shared/ambientSky/skyClock";
+import { sowStars, starFrame, type Star } from "@t3tools/shared/ambientSky/starField";
+import { windRows } from "@t3tools/shared/ambientSky/windField";
+
+import { createBrowserSkyHost } from "./browserSkyHost";
 
 export interface SkyHandle {
   readonly setOnScreen: (onScreen: boolean) => void;
@@ -188,7 +190,7 @@ class Sky {
   }
 }
 
-let clock: SkyClock | null = null;
+let clock: SkyClock<number> | null = null;
 
 /** Mounts still; call `setStill(false)` to start the drift. */
 export function mountSky(canvas: HTMLCanvasElement): SkyHandle {

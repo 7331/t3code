@@ -1,3 +1,4 @@
+import { PORTAL_THEME_ID } from "@t3tools/shared/themePalettes";
 import { useEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "~/hooks/useMediaQuery";
@@ -6,7 +7,6 @@ import { useClientSettings } from "~/hooks/useSettings";
 import { useTheme } from "~/hooks/useTheme";
 import { getThemeDefinition, resolveThemeHalf } from "~/themePalette";
 
-import { PORTAL_THEME_ID } from "../portalTheme";
 import { mountSky, type SkyHandle } from "./skyCanvas";
 import "./ambientSky.css";
 

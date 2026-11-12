@@ -23,11 +23,11 @@ of the selected theme.
 
 ## Portal theme and ambient sky
 
-On web and desktop, the **Portal** theme uses the Ubuntu typeface unless you set an interface font
-under **Typography**. While it is active, empty screens such as a new thread show a slow ASCII sky:
-stars in dark mode and wind in light mode. The sky holds still while you write a prompt, when the
-window is in the background, and when your system asks for reduced motion. Turn off **Ambient sky**
-in **Settings → Appearance** to hide it.
+The **Portal** theme uses the Ubuntu typeface; on web and desktop, an interface font set under
+**Typography** takes precedence. While it is active, empty screens such as a new thread show a slow
+ASCII sky: stars in dark mode and wind in light mode. The sky holds still while you write a prompt,
+when the window or app is in the background, and when your system asks for reduced motion. Turn off
+**Ambient sky** in **Settings → Appearance** to hide it.
 
 ## Composer context
 

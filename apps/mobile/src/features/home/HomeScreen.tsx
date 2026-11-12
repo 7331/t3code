@@ -38,6 +38,7 @@ import {
   deriveCenteredContentHorizontalPadding,
 } from "../../lib/layout";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { AmbientSkyBackdrop, AmbientSkyClear } from "../portal/sky/AmbientSky";
 import { FloatingActionButton } from "../../components/ui/FloatingActionButton";
 import type { WorkspaceEnvironment, WorkspaceState } from "../../state/workspaceModel";
 import type { SavedRemoteConnection } from "../../lib/connection";
@@ -674,6 +675,33 @@ export function HomeScreen(props: HomeScreenProps) {
   });
 
   if (!hasAnyThreads) {
+    const emptyContent = (
+      <>
+        <EmptyState
+          title={emptyState.title}
+          detail={emptyState.detail}
+          actionLabel={!props.catalogState.hasReadyEnvironment ? "Add environment" : undefined}
+          onAction={!props.catalogState.hasReadyEnvironment ? props.onAddConnection : undefined}
+          action={
+            Platform.OS === "android" && !props.catalogState.hasReadyEnvironment ? (
+              <FloatingActionButton
+                label="Add environment"
+                icon="plus"
+                variant="extended"
+                tone="primary"
+                onPress={props.onAddConnection}
+              />
+            ) : undefined
+          }
+          variant="plain"
+        />
+        {emptyState.loading ? (
+          <View className="mt-4 items-center">
+            <AppActivityIndicator colorClassName="accent-icon-muted" />
+          </View>
+        ) : null}
+      </>
+    );
     return (
       <View className={containerClassName}>
         <ScreenContent surface={sidebarSurface ? "drawer" : "screen"}>
@@ -690,35 +718,15 @@ export function HomeScreen(props: HomeScreenProps) {
               paddingRight: 32 + (contentSideInsets?.right ?? 0),
             }}
           >
-            <View className="w-full max-w-[430px]">
-              <EmptyState
-                title={emptyState.title}
-                detail={emptyState.detail}
-                actionLabel={
-                  !props.catalogState.hasReadyEnvironment ? "Add environment" : undefined
-                }
-                onAction={
-                  !props.catalogState.hasReadyEnvironment ? props.onAddConnection : undefined
-                }
-                action={
-                  Platform.OS === "android" && !props.catalogState.hasReadyEnvironment ? (
-                    <FloatingActionButton
-                      label="Add environment"
-                      icon="plus"
-                      variant="extended"
-                      tone="primary"
-                      onPress={props.onAddConnection}
-                    />
-                  ) : undefined
-                }
-                variant="plain"
-              />
-              {emptyState.loading ? (
-                <View className="mt-4 items-center">
-                  <AppActivityIndicator colorClassName="accent-icon-muted" />
+            {sidebarSurface ? (
+              <View className="w-full max-w-[430px]">{emptyContent}</View>
+            ) : (
+              <AmbientSkyBackdrop>
+                <View className="w-full max-w-[430px]">
+                  <AmbientSkyClear>{emptyContent}</AmbientSkyClear>
                 </View>
-              ) : null}
-            </View>
+              </AmbientSkyBackdrop>
+            )}
           </View>
         </ScreenContent>
       </View>

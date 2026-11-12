@@ -119,10 +119,10 @@
       "sourceUrl": "https://github.com/ghostty-org/ghostty"
     },
     {
-      "bundles": ["assets", "web"],
+      "bundles": ["assets", "mobile", "web"],
       "license": "MIT",
       "name": "ascii.rest stars and wind",
-      "noticeFile": "apps/web/src/portal/sky/LICENSE.ascii-rest",
+      "noticeFile": "packages/shared/src/ambientSky/LICENSE.ascii-rest",
       "sourceUrl": "https://github.com/bas3line/ascii"
     },
     {
@@ -132,6 +132,14 @@
       "noticeFile": "apps/web/src/portal/fonts/LICENSE",
       "sourceUrl": "https://github.com/fontsource/font-files/tree/main/fonts/google/ubuntu",
       "version": "5.2.8"
+    },
+    {
+      "bundles": ["assets", "mobile"],
+      "license": "Ubuntu-font-1.0",
+      "name": "Ubuntu font family",
+      "noticeFile": "apps/mobile/src/features/portal/fonts/LICENSE",
+      "sourceUrl": "https://assets.ubuntu.com/v1/0cef8205-ubuntu-font-family-0.83.zip",
+      "version": "0.83"
     },
     {
       "bundles": ["assets", "web"],
