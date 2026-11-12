@@ -61,10 +61,14 @@ vi.mock("../../components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("../../components/ui/ScreenScrollView", () => ({ ScreenScrollView: "ScrollView" }));
 vi.mock("../settings/components/SettingsScreen", () => ({ SettingsScreen: "SettingsScreen" }));
 vi.mock("../../components/ui/ThemedSwitch", () => ({ ThemedSwitch: "Switch" }));
+// The screen raises alerts through the Portal dialog module, which takes Alert.alert's arguments.
+vi.mock("../../components/ui/Dialog", () => ({ alert: state.alert }));
+vi.mock("../../components/ui/AppActivityIndicator", () => ({
+  AppActivityIndicator: "ActivityIndicator",
+}));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   ActivityIndicator: "ActivityIndicator",
-  Alert: { alert: state.alert },
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   View: "View",

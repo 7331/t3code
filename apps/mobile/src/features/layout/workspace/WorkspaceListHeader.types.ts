@@ -30,7 +30,5 @@ export interface WorkspaceListHeaderProps {
 }
 
 export function workspaceListFilterIcon(customized: boolean) {
-  return customized
-    ? "line.3.horizontal.decrease.circle.fill"
-    : "line.3.horizontal.decrease.circle";
+  return customized ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease";
 }

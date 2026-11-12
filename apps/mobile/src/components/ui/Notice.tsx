@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { AccessibilityInfo, Platform, Pressable, View } from "react-native";
 
 import { cn } from "../../lib/cn";
+import { MOBILE_SHAPE } from "../../lib/designTokens";
 import { AppText } from "./AppText";
 import { SymbolView, type AppSymbolName } from "./AppSymbol";
 import { GlassSurface } from "./GlassSurface";
@@ -68,7 +69,7 @@ export function Notice(props: {
   );
   if (props.floating && Platform.OS === "ios")
     return (
-      <GlassSurface className="p-4" style={{ borderRadius: 20 }}>
+      <GlassSurface className="p-4" style={{ borderRadius: MOBILE_SHAPE.group }}>
         {content}
       </GlassSurface>
     );

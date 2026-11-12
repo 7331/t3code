@@ -1,3 +1,5 @@
+import type { AppBarSearch } from "../../components/ui/AppBar.types";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { Button } from "../../components/ui/Button";
 import { LegendList } from "@legendapp/list/react-native";
@@ -107,6 +109,8 @@ export function FileTreeBrowser(props: {
   readonly isPending: boolean;
   readonly isRefreshing: boolean;
   readonly searchQuery: string;
+  /** The phone shell's Portal search field, drawn first in the list. */
+  readonly search?: AppBarSearch;
   readonly searchResultPaths: ReadonlySet<string> | null;
   readonly searchTruncated: boolean;
   readonly selectedPath: string | null;
@@ -236,6 +240,7 @@ export function FileTreeBrowser(props: {
       renderItem={renderItem}
       ListHeaderComponent={
         <>
+          {props.search ? <PortalListSearch search={props.search} className="px-4 pb-2" /> : null}
           {props.error && props.entries.length > 0 ? (
             <Text accessibilityRole="alert" className="mx-4 my-2 text-xs text-foreground-muted">
               {props.error}

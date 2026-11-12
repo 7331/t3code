@@ -21,6 +21,7 @@ import {
   type MarkdownStyle,
 } from "react-native-enriched-markdown";
 import { codeFenceRenderer } from "./codeBlockMarkdown";
+import { MONO_FONT_FAMILY } from "../lib/fontFamilies";
 import { HighlightedCodeBlock } from "./HighlightedCodeBlock";
 import { MermaidCodeBlock } from "./MermaidCodeBlock";
 import type { SelectableMarkdownTextProps } from "./SelectableMarkdownText.types";
@@ -46,14 +47,15 @@ function enrichedStyle(
   dark: boolean,
   fontScale: number,
 ): MarkdownStyle {
-  const monospace = Platform.OS === "ios" ? "Menlo" : "monospace";
+  const monospace = MONO_FONT_FAMILY;
   // Portal draws comments in its tertiary text: the code colour, dimmed.
   const tertiaryCodeColor = themeColorWithAlpha(style.codeColor, 0.55);
   // Keep the radius modest: iOS clips square table-cell borders without stroking the corner arcs.
   const block = {
     marginTop: 4,
     marginBottom: 12,
-    borderRadius: 8,
+    // Portal's code block and table: `rounded-sm` (6pt) with a hairline.
+    borderRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: style.dividerColor,
   };

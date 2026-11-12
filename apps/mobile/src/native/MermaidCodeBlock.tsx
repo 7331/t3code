@@ -8,6 +8,7 @@ import { parse, Svg, SvgXml } from "react-native-svg";
 
 import { FilePreviewModal } from "../components/ui/FilePreviewModal";
 import { copyTextWithHaptic } from "../lib/copyTextWithHaptic";
+import { MONO_FONT_FAMILY } from "../lib/fontFamilies";
 import { mermaidSvgForNative, withDiagramBackground } from "../lib/mermaidSvg";
 import { themeColorWithAlpha } from "../lib/mobileTheme";
 import { CodeBlockFrame, CodeBlockHeaderButton } from "./CodeBlockFrame";
@@ -44,7 +45,7 @@ function loadDiagram(source: string): Promise<Diagram> {
   return load;
 }
 
-const MONOSPACE = Platform.OS === "ios" ? "Menlo" : "monospace";
+const MONOSPACE = MONO_FONT_FAMILY;
 // Pele measures labels with metrics close to Helvetica when no canvas is available.
 const DIAGRAM_FONT = Platform.OS === "ios" ? "Helvetica" : "sans-serif";
 
@@ -193,7 +194,6 @@ function MermaidBlock(props: MermaidCodeBlockProps & { readonly diagram: Diagram
 
   return (
     <CodeBlockFrame
-      label="Mermaid"
       textStyle={textStyle}
       actions={
         <>

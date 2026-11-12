@@ -1,6 +1,5 @@
 import type { SubagentPillSegment } from "@t3tools/client-runtime/state/thread-subagents";
 import { formatDuration } from "@t3tools/shared/orchestrationTiming";
-import { GlassContainer, GlassView } from "expo-glass-effect";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   type LayoutChangeEvent,
@@ -20,13 +19,11 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { withUniwind } from "uniwind";
 
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { ControlPill } from "../../components/ui/ControlPill";
-import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import { BrowserPreviewButton } from "../browser/browser-preview-button";
 import { DevicePreviewButton } from "../devices/device-preview-button";
 import type { FloatingWorkingStatus } from "./floating-working-status";
@@ -36,7 +33,6 @@ import { useVisibleSecondClock } from "./use-visible-second-clock";
 const CONTROL_HEIGHT = 38.5;
 const CONTROL_GAP = 8;
 const COMPOSER_CAPSULE_INSET = 6;
-const GLASS_MERGE_SPACING = 12;
 const CONTROL_ENTERING = FadeIn.duration(180).reduceMotion(ReduceMotion.System);
 const CONTROL_EXITING = FadeOut.duration(120).reduceMotion(ReduceMotion.System);
 const CONTROL_TIMING = {
@@ -48,15 +44,6 @@ const CONTROL_ROW_GAP = 14;
 const CONTROL_SEPARATION = (CONTROL_ROW_GAP + CONTROL_HEIGHT) / 2;
 const LABEL_ENTERING = FadeIn.duration(160).delay(80).reduceMotion(ReduceMotion.System);
 const LABEL_EXITING = FadeOut.duration(100).reduceMotion(ReduceMotion.System);
-
-// Expo reapplies glass after layout or reattachment, restoring material UIKit can lose behind visible labels.
-const UniwindGlassView = withUniwind(GlassView, {
-  style: { fromClassName: "className" },
-});
-const UniwindGlassContainer = withUniwind(GlassContainer, {
-  style: { fromClassName: "className" },
-});
-const AnimatedGlassView = Animated.createAnimatedComponent(UniwindGlassView);
 
 // Segment widths feed back into labelWidth; ignore sub-point changes to avoid rounding-driven ellipsis loops.
 function settleWidth(next: number) {
@@ -88,7 +75,6 @@ export function FloatingWorkingControl(props: {
   const [extensionWidth, setExtensionWidth] = useState(0);
   const extensionStatus = props.extensionStatus ?? null;
   const extensionOnly = props.status?.kind === "extension";
-  const useGlass = NATIVE_LIQUID_GLASS_SUPPORTED && !extensionOnly;
   const action =
     props.status?.kind === "background" ||
     props.status?.kind === "lifecycle" ||
@@ -134,7 +120,7 @@ export function FloatingWorkingControl(props: {
     opacity: separationProgress.value,
   }));
 
-  // Animate an in-flow sizer for native glass layout. Measure labels at fixed width to avoid repeated animation retargeting.
+  // Animate an in-flow sizer so the capsule eases to each label's width. Measure labels at fixed width to avoid repeated animation retargeting.
   const capsuleWidth = useSharedValue<number | null>(null);
   const measuredWidthRef = useRef<number | null>(null);
   const handleLabelLayout = (event: LayoutChangeEvent) => {
@@ -307,42 +293,10 @@ export function FloatingWorkingControl(props: {
       className="absolute left-0 right-0 z-20 items-center"
       style={[{ top: -CONTROL_OVERLAY_OFFSET }, liftStyle]}
       onLayout={(event) => setOverlayWidth(event.nativeEvent.layout.width)}
-      entering={useGlass || extensionOnly || reducedMotion ? undefined : CONTROL_ENTERING}
-      exiting={useGlass || extensionOnly || reducedMotion ? undefined : CONTROL_EXITING}
+      entering={extensionOnly || reducedMotion ? undefined : CONTROL_ENTERING}
+      exiting={extensionOnly || reducedMotion ? undefined : CONTROL_EXITING}
     >
-      {hasCapsule && useGlass ? (
-        <UniwindGlassContainer
-          spacing={GLASS_MERGE_SPACING}
-          pointerEvents="box-none"
-          className="flex-row items-center gap-4"
-        >
-          <AnimatedGlassView
-            colorScheme={props.colorScheme}
-            glassEffectStyle="regular"
-            isInteractive={capsuleInteractive}
-            pointerEvents={capsuleInteractive ? "box-none" : "none"}
-            className="h-11 items-center justify-center overflow-hidden rounded-full"
-            style={capsuleStyle}
-          >
-            {capsuleContent}
-          </AnimatedGlassView>
-
-          <AnimatedGlassView
-            colorScheme={props.colorScheme}
-            glassEffectStyle={{ style: props.showScrollToEnd ? "regular" : "none", animate: true }}
-            isInteractive
-            pointerEvents={props.showScrollToEnd ? "auto" : "none"}
-            accessibilityElementsHidden={!props.showScrollToEnd}
-            importantForAccessibility={props.showScrollToEnd ? "auto" : "no-hide-descendants"}
-            className="h-11 w-11 items-center justify-center overflow-hidden rounded-full"
-            style={arrowTransformStyle}
-          >
-            <Animated.View style={arrowContentStyle}>
-              <ScrollToEndButton disabled={!props.showScrollToEnd} onPress={props.onScrollToEnd} />
-            </Animated.View>
-          </AnimatedGlassView>
-        </UniwindGlassContainer>
-      ) : hasCapsule ? (
+      {hasCapsule ? (
         <View pointerEvents="box-none" className="flex-row items-center gap-4">
           <Animated.View
             pointerEvents={capsuleInteractive ? "box-none" : "none"}
@@ -363,26 +317,17 @@ export function FloatingWorkingControl(props: {
               activateOnPressIn
               className="h-11 w-11 border border-border bg-glass-fallback shadow-md shadow-black/10"
               disabled={!props.showScrollToEnd}
-              icon={{ ios: "chevron.down", android: "keyboard_arrow_down" }}
+              icon="arrow.down"
               onPress={props.onScrollToEnd}
             />
           </Animated.View>
         </View>
-      ) : NATIVE_LIQUID_GLASS_SUPPORTED ? (
-        <UniwindGlassView
-          colorScheme={props.colorScheme}
-          glassEffectStyle="regular"
-          isInteractive
-          className="h-11 w-11 items-center justify-center overflow-hidden rounded-full"
-        >
-          <ScrollToEndButton onPress={props.onScrollToEnd} />
-        </UniwindGlassView>
       ) : (
         <ControlPill
           accessibilityLabel="Scroll to end"
           activateOnPressIn
           className="h-11 w-11 border border-border bg-glass-fallback shadow-md shadow-black/10"
-          icon={{ ios: "chevron.down", android: "keyboard_arrow_down" }}
+          icon="arrow.down"
           onPress={props.onScrollToEnd}
         />
       )}
@@ -678,17 +623,4 @@ function formatWorkingDuration(startedAt: string, nowMs: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${minutes}m ${seconds}s`;
-}
-
-function ScrollToEndButton(props: { readonly disabled?: boolean; readonly onPress: () => void }) {
-  return (
-    <ControlPill
-      accessibilityLabel="Scroll to end"
-      activateOnPressIn
-      className="h-11 w-11 bg-transparent"
-      disabled={props.disabled}
-      icon={{ ios: "chevron.down", android: "keyboard_arrow_down" }}
-      onPress={props.onPress}
-    />
-  );
 }

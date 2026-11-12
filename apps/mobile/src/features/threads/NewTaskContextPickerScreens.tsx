@@ -49,6 +49,7 @@ import {
   useConnectionDiagnosis,
 } from "../connection/ConnectionDiagnosisDetails";
 import { environmentStatusText } from "../connection/environmentStatusText";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
 
 const BRANCH_SEARCH_DEBOUNCE_MS = 150;
 
@@ -167,7 +168,7 @@ function PickerSurface(props: { readonly children: ReactNode }) {
     <View
       className={
         Platform.OS === "android"
-          ? "overflow-hidden rounded-[28px] bg-grouped-card"
+          ? "overflow-hidden rounded-2xl bg-grouped-card"
           : "overflow-hidden rounded-2xl bg-grouped-card"
       }
     >
@@ -394,7 +395,7 @@ export function BranchPickerScreen(props: {
     <View
       className={cn(
         "mb-3 overflow-hidden",
-        Platform.OS === "android" ? "rounded-[28px]" : "rounded-2xl",
+        Platform.OS === "android" ? "rounded-2xl" : "rounded-2xl",
       )}
     >
       <ToggleRow
@@ -414,6 +415,7 @@ export function BranchPickerScreen(props: {
         scrollEnabled={false}
         showsVerticalScrollIndicator={false}
       >
+        <PortalListSearch search={search} />
         {branchListHeader}
         <View
           className="flex-1 items-center justify-center gap-3 px-4"
@@ -453,7 +455,12 @@ export function BranchPickerScreen(props: {
         keyExtractor={(branch) =>
           `${branch.remoteName ?? "local"}:${branch.name}:${branch.worktreePath ?? ""}`
         }
-        ListHeaderComponent={branchListHeader}
+        ListHeaderComponent={
+          <>
+            <PortalListSearch search={search} />
+            {branchListHeader}
+          </>
+        }
         ListFooterComponent={
           props.refreshing ? (
             <View className="items-center py-4">

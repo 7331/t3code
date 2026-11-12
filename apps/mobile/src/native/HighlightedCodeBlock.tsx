@@ -9,24 +9,6 @@ import { CodeBlockFrame, CodeBlockHeaderButton } from "./CodeBlockFrame";
 import { fencedCodeMarkdown } from "./codeBlockMarkdown";
 import type { NativeMarkdownTextStyle } from "./SelectableMarkdownText.types";
 
-// Header names from enriched-markdown's CodeBlockLanguages.cpp that are not the fence capitalized.
-const FENCE_DISPLAY_NAMES: Readonly<Record<string, string>> = {
-  cc: "C++",
-  cpp: "C++",
-  cxx: "C++",
-  cs: "C#",
-  csharp: "C#",
-  graphql: "GraphQL",
-  objc: "Objective-C",
-  objectivec: "Objective-C",
-  php: "PHP",
-  rb: "Ruby",
-  scss: "SCSS",
-  sql: "SQL",
-  toml: "TOML",
-  xml: "XML",
-};
-
 // The native block's long-press menu, with its labels and iOS symbols.
 const CODE_MENU_ACTIONS = [
   { id: "copy-code", title: "Copy", image: "doc.on.doc" },
@@ -51,7 +33,6 @@ export function HighlightedCodeBlock(props: {
     theme: props.scheme,
     enabled: props.complete,
   });
-  const fence = props.fence.toLowerCase();
   let offset = 0;
   const text = (
     // Not selectable: as in the native block, a long-press opens the copy menu instead.
@@ -98,7 +79,6 @@ export function HighlightedCodeBlock(props: {
   );
   return (
     <CodeBlockFrame
-      label={FENCE_DISPLAY_NAMES[fence] ?? fence.charAt(0).toUpperCase() + fence.slice(1)}
       textStyle={textStyle}
       actions={
         <CodeBlockHeaderButton

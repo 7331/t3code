@@ -1,0 +1,38 @@
+--- a/ios/segments/ENRMCodeBlockContainerView.m
++++ b/ios/segments/ENRMCodeBlockContainerView.m
+@@ -687,33 +687,8 @@
+     }
+   }
+ 
+-  CGFloat inset = [self contentInset];
+-  CGFloat headerH = [self headerHeight];
+-
+-  // Divider between the header and the code, centered in the gap the code
+-  // text's top inset creates, so it adds no height of its own.
+-  RCTUIColor *dividerColor = [[_config codeBlockColor] colorWithAlphaComponent:kENRMHeaderDividerAlpha];
+-  if (dividerColor) {
+-    CGRect dividerRect = CGRectMake(borderWidth, headerH + inset / 2, self.bounds.size.width - borderWidth * 2, 1);
+-    [dividerColor setFill];
+-#if !TARGET_OS_OSX
+-    [[UIBezierPath bezierPathWithRect:dividerRect] fill];
+-#else
+-    [[NSBezierPath bezierPathWithRect:dividerRect] fill];
+-#endif
+-  }
+-
+-  if (_languageLabel.length > 0) {
+-    // Keep clear of the header buttons, as Android caps its label view; a long
+-    // name is cut short with an ellipsis.
+-    CGFloat headerButtonsWidth = _showsWrapButton ? headerH * 2 : headerH;
+-    CGFloat labelMaxWidth = MAX(self.bounds.size.width - inset * 2 - headerButtonsWidth, 0);
+-    CGRect labelRect = CGRectMake(inset, [self headerCenterY] - _languageLabelSize.height / 2,
+-                                  MIN(_languageLabelSize.width, labelMaxWidth), _languageLabelSize.height);
+-    [_languageLabel drawWithRect:labelRect
+-                         options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingTruncatesLastVisibleLine
+-                         context:nil];
+-  }
++  // T3 Portal patch: no language label or divider. As in Portal's code block on touch screens, the
++  // top band holds only the copy button, in the block's corner.
+ }
+ 
+ - (NSString *)fencedMarkdown

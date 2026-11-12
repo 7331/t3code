@@ -32,10 +32,7 @@ export function ListSection(props: {
       ) : null}
       <View
         className="overflow-hidden border-continuous bg-grouped-card"
-        style={{
-          borderRadius:
-            Platform.OS === "android" ? MOBILE_SHAPE.group.android : MOBILE_SHAPE.group.ios,
-        }}
+        style={{ borderRadius: MOBILE_SHAPE.group }}
       >
         {props.children}
       </View>

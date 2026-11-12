@@ -901,25 +901,18 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                           }}
                         >
                           <PullRequestIdentity pr={identity} params={params} />
-                          {/* UIKit draws the tapped control's glass lens outside the hidden
-                              tab's opacity, so only the visible tab mounts the control. */}
-                          {Platform.OS !== "ios" || section === tab ? (
-                            <SegmentedControl
-                              options={[
-                                { value: "overview", label: "Overview" },
-                                ...(guidesEnabled
-                                  ? [{ value: "guide" as const, label: "Guide" }]
-                                  : []),
-                                { value: "activity", label: "Activity" },
-                              ]}
-                              selected={section}
-                              onSelect={selectSection}
-                              role="tab"
-                              size="compact"
-                            />
-                          ) : (
-                            <View style={{ height: 32 }} />
-                          )}
+                          <SegmentedControl
+                            options={[
+                              { value: "overview", label: "Overview" },
+                              ...(guidesEnabled
+                                ? [{ value: "guide" as const, label: "Guide" }]
+                                : []),
+                              { value: "activity", label: "Activity" },
+                            ]}
+                            selected={section}
+                            onSelect={selectSection}
+                            role="tab"
+                          />
                         </View>
                       ) : null}
                     </>
@@ -1369,14 +1362,12 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
                 title="Only test files changed"
                 detail="Test files are hidden from this review."
                 action={<Button label="Show test files" tone="contrast" onPress={filter.showAll} />}
-                variant="plain"
               />
             </View>
           ) : !result.isPending && !result.error && !seekingFile ? (
             <EmptyState
               title="Diff unavailable"
               detail={`Open this ${terminology.singular} on its provider to view the changes.`}
-              variant="plain"
             />
           ) : null}
           {result.nextCursor && result.isPending && data.rows.length && !seekingFile ? (

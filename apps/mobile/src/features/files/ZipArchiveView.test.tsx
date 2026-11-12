@@ -103,6 +103,7 @@ vi.mock("@react-navigation/native", () => ({
   },
 }));
 vi.mock("../../native/NativeScrollViewMarker", () => ({ NativeScrollView: () => null }));
+vi.mock("../../components/ui/AppActivityIndicator", () => ({ AppActivityIndicator: () => null }));
 vi.mock("../../components/ui/AppBar", () => {
   interface Item {
     readonly id: string;

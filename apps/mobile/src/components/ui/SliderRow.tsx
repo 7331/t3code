@@ -1,28 +1,33 @@
-import { Slider } from "@expo/ui/swift-ui";
-import {
-  accessibilityLabel,
-  accessibilityValue,
-  disabled,
-  tint,
-} from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
-import { useRef } from "react";
+import { useState } from "react";
 import { View } from "react-native";
+import {
+  GestureDetector,
+  usePanGesture,
+  useTapGesture,
+  useExclusiveGestures,
+} from "react-native-gesture-handler";
 
 import { AppText } from "./AppText";
 import { SymbolView } from "./AppSymbol";
-import { NativeThemeHost } from "./NativeThemeHost";
 import type { SliderRowProps } from "./SliderRow.types";
-import { useControlTheme } from "./useControlTheme";
 
 export type { SliderRowProps } from "./SliderRow.types";
 
+// Portal's slider on touch screens: a 4-point track tinted with the primary colour, filled up to
+// a 24-point thumb ringed in the primary colour.
+const THUMB = 24;
+const TRACK = 4;
+const HEIGHT = 44;
+
+/** A labelled setting slider, drawn like Portal's on both platforms. */
 export function SliderRow(props: SliderRowProps) {
-  const { colors } = useControlTheme();
-  // The value of the drag in progress; null until the drag moves.
-  const draft = useRef<number | null>(null);
-  const editing = useRef(false);
-  const commit = (value: number) => {
+  const [width, setWidth] = useState(0);
+  const span = Math.max(0, width - THUMB);
+  const range = props.max - props.min;
+  const fraction = range > 0 ? Math.min(1, Math.max(0, (props.value - props.min) / range)) : 0;
+
+  const select = (value: number) => {
     if (props.disabled) return;
     const next = Math.min(
       props.max,
@@ -32,6 +37,28 @@ export function SliderRow(props: SliderRowProps) {
     void Haptics.selectionAsync().catch(() => undefined);
     props.onChange(next);
   };
+  const selectAt = (x: number) => {
+    if (span <= 0) return;
+    select(props.min + (Math.min(span, Math.max(0, x - THUMB / 2)) / span) * range);
+  };
+
+  const drag = usePanGesture({
+    runOnJS: true,
+    enabled: !props.disabled,
+    activeOffsetX: [-4, 4],
+    failOffsetY: [-10, 10],
+    onActivate: (event) => selectAt(event.x),
+    onUpdate: (event) => selectAt(event.x),
+  });
+  const tap = useTapGesture({
+    runOnJS: true,
+    enabled: !props.disabled,
+    onDeactivate: (event) => {
+      if (!event.canceled) selectAt(event.x);
+    },
+  });
+  const gesture = useExclusiveGestures(drag, tap);
+
   return (
     <View className={props.disabled ? "gap-1 p-4 opacity-[0.45]" : "gap-1 p-4"}>
       <View className="flex-row items-center gap-4">
@@ -45,31 +72,52 @@ export function SliderRow(props: SliderRowProps) {
         {props.minimumIcon ? (
           <SymbolView name={props.minimumIcon} size={15} tintColorClassName="accent-icon-muted" />
         ) : null}
-        <NativeThemeHost style={{ flex: 1, height: 44 }}>
-          <Slider
-            min={props.min}
-            max={props.max}
-            step={props.step}
-            value={props.value}
-            modifiers={[
-              tint(colors["--color-primary"]),
-              disabled(Boolean(props.disabled)),
-              accessibilityLabel(props.label),
-              accessibilityValue(props.valueLabel),
-            ]}
-            onValueChange={(value) => {
-              // Accessibility adjustments do not begin a touch editing session.
-              if (editing.current) draft.current = value;
-              else commit(value);
-            }}
-            onEditingChanged={(isEditing) => {
-              editing.current = isEditing;
-              const value = draft.current;
-              draft.current = null;
-              if (!isEditing && value !== null) commit(value);
-            }}
-          />
-        </NativeThemeHost>
+        <GestureDetector gesture={gesture}>
+          <View
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel={props.label}
+            accessibilityValue={{ text: props.valueLabel }}
+            accessibilityState={{ disabled: Boolean(props.disabled) }}
+            accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+            onAccessibilityAction={({ nativeEvent }) =>
+              select(props.value + (nativeEvent.actionName === "increment" ? 1 : -1) * props.step)
+            }
+            onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+            className="flex-1"
+            style={{ height: HEIGHT }}
+          >
+            <View
+              className="absolute rounded-full bg-primary/20"
+              style={{
+                left: THUMB / 2,
+                right: THUMB / 2,
+                top: (HEIGHT - TRACK) / 2,
+                height: TRACK,
+              }}
+            />
+            <View
+              className="absolute rounded-full bg-primary"
+              style={{
+                left: THUMB / 2,
+                width: fraction * span,
+                top: (HEIGHT - TRACK) / 2,
+                height: TRACK,
+              }}
+            />
+            {width > 0 ? (
+              <View
+                className="absolute rounded-full border-2 border-primary bg-screen shadow-sm"
+                style={{
+                  left: fraction * span,
+                  top: (HEIGHT - THUMB) / 2,
+                  width: THUMB,
+                  height: THUMB,
+                }}
+              />
+            ) : null}
+          </View>
+        </GestureDetector>
         {props.maximumIcon ? (
           <SymbolView name={props.maximumIcon} size={22} tintColorClassName="accent-icon-muted" />
         ) : null}

@@ -20,6 +20,8 @@ import { useWorkspaceTabs } from "./WorkspaceTabsContext";
 import { shouldRestoreNativeSearch } from "./workspace-tabs-state";
 import { useFloatingWorkspaceTabs, useSidebarWorkspaceTabs } from "./useSystemWorkspaceTabBar";
 import { WorkspaceTabToolbarButtons } from "./WorkspaceSectionToolbar";
+import { portalDrawer } from "../../portal/shell/portalDrawerStore";
+import { usePortalPhoneShell } from "../../portal/shell/usePortalPhoneShell";
 
 const SEARCH_LABELS = {
   threads: "Search threads",
@@ -49,6 +51,8 @@ export function WorkspaceToolbar(props: {
   const { layout, togglePrimarySidebar } = useAdaptiveWorkspaceLayout();
   const { panes } = useWorkspacePaneState();
   const searchRef = useRef<SearchBarCommands>(null);
+  // The phone shell's lists draw Portal's search field themselves, so the bar has none.
+  const portalPhoneShell = usePortalPhoneShell();
   const settingsMenu = useSettingsEnvironmentMenu();
   // The Settings list takes the selected tab's place, so search follows it.
   const selectedTab = workspace.settingsOpen ? "settings" : workspace.state.selectedTab;
@@ -151,6 +155,7 @@ export function WorkspaceToolbar(props: {
           // Without Liquid Glass, Settings keeps its search field out instead of a search button,
           // which would take the header's trailing items from the scope filter.
           headerSearchBarOptions:
+            !portalPhoneShell &&
             (NATIVE_LIQUID_GLASS_SUPPORTED ||
               tab.searchMode !== "resting" ||
               workspace.settingsOpen) &&
@@ -209,11 +214,13 @@ export function WorkspaceToolbar(props: {
               onPress={props.onNewTask}
             />
           )}
-          {NATIVE_LIQUID_GLASS_SUPPORTED ? null : (
+          {NATIVE_LIQUID_GLASS_SUPPORTED ||
+          (portalPhoneShell && selectedTab !== "threads") ? null : (
             <Toolbar.Button
               accessibilityLabel={searchLabel}
               icon="magnifyingglass"
-              onPress={focusSearch}
+              // The phone shell searches threads in its drawer, as Portal searches its chat list.
+              onPress={portalPhoneShell ? portalDrawer.openSearch : focusSearch}
             />
           )}
         </Toolbar>

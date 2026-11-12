@@ -18,11 +18,7 @@ export function PullRequestReadStatus(props: {
   return props.pending ? (
     <AppActivityIndicator className="my-12" colorClassName="accent-icon" />
   ) : props.error ? (
-    <EmptyState
-      title={`Couldn't load this ${props.terminology.singular}`}
-      detail={props.error}
-      variant="plain"
-    />
+    <EmptyState title={`Couldn't load this ${props.terminology.singular}`} detail={props.error} />
   ) : null;
 }
 

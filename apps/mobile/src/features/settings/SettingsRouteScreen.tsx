@@ -33,6 +33,8 @@ import { useSettingsEnvironmentMenu } from "./components/SettingsEnvironmentFilt
 import { useSettingsEnvironmentFilter } from "./settings-environment-filter";
 import { filterSettingsSections } from "./settings-search";
 import { usePaneRole } from "../../components/ui/Pane";
+import { PortalTabSearchField } from "../portal/shell/PortalTabSearchField";
+import { usePortalPhoneShell } from "../portal/shell/usePortalPhoneShell";
 import { I18nProvider, useGT, useLanguagePreference } from "../../i18n/I18nProvider";
 import { nativeLanguageName } from "@t3tools/client-runtime/locales";
 import { SUPPORTED_LOCALES } from "../../i18n/locales";
@@ -92,6 +94,8 @@ function TranslatedSettingsListScreen(props: {
   const gt = useGT();
   const workspace = useWorkspaceTabs();
   const environmentMenu = useSettingsEnvironmentMenu();
+  // On the phone the list draws Portal's search field at its top instead.
+  const portalPhoneShell = usePortalPhoneShell();
   return (
     <SettingsSidebarContext value={props.sidebar ? { selected: props.selected } : null}>
       <View className="flex-1 bg-screen">
@@ -100,7 +104,7 @@ function TranslatedSettingsListScreen(props: {
           workspaceRoot={props.sidebar}
           menus={[environmentMenu]}
           search={
-            workspace
+            workspace && !portalPhoneShell
               ? {
                   value: workspace.state.tabs.settings.query,
                   onChangeText: (query) =>
@@ -190,6 +194,7 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
   // UIKit insets the scroll view by its column's safe area, which this context can report as 0.
   const bottomSafeArea = useNativeColumnLayoutMetrics()?.safeArea.bottom ?? insets.bottom;
   const workspace = useWorkspaceTabs();
+  const portalPhoneShell = usePortalPhoneShell();
   const query = workspace?.state.tabs.settings.query ?? "";
   const overflowRows = useOverflowRows();
   const indexSections = useSettingsIndexSections();
@@ -219,6 +224,9 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
               : Math.max(Math.max(insets.bottom, 18) + 18, workspace?.bottomClearance ?? 0),
         }}
       >
+        {workspace && portalPhoneShell ? (
+          <PortalTabSearchField tab="settings" placeholder={gt("Search settings")} />
+        ) : null}
         {sections.length ? (
           sections.map((section, index) => (
             <SettingsSection key={section.title ?? `untitled-${index}`} title={section.title}>
@@ -229,7 +237,6 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
           ))
         ) : (
           <EmptyState
-            variant="plain"
             title={gt("No results")}
             detail={gt("No settings match “{query}”.", { query: query.trim() })}
           />

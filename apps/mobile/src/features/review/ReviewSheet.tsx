@@ -198,19 +198,19 @@ function ReviewSelectionActionBar(props: {
     >
       {props.onOpenComment ? (
         <Pressable
-          className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary px-5"
+          className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-[10px] bg-primary px-4"
           onPress={props.onOpenComment}
         >
           {content}
         </Pressable>
       ) : (
-        <View className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary px-5">
+        <View className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-[10px] bg-primary px-4">
           {content}
         </View>
       )}
 
       <Pressable
-        className="h-12 w-12 items-center justify-center rounded-full bg-primary"
+        className="size-11 items-center justify-center rounded-full bg-primary"
         onPress={props.onClear}
       >
         <SymbolView
@@ -248,7 +248,7 @@ const ReviewFileNavigatorRow = function ReviewFileNavigatorRow(props: {
       className={
         Platform.OS === "android"
           ? cn(
-              "mt-1 min-h-12 justify-center rounded-[20px] px-3 py-2 active:bg-subtle",
+              "mt-1 min-h-12 justify-center rounded-[10px] px-3 py-2 active:bg-subtle",
               selected && "bg-subtle-strong",
             )
           : selected

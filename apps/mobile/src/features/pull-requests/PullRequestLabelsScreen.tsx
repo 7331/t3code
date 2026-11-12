@@ -80,7 +80,7 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
       query={query}
       onQueryChange={setQuery}
     >
-      {({ paddingBottom }) => (
+      {({ paddingBottom, header }) => (
         <LegendList
           renderScrollComponent={NativeScrollView}
           data={candidates}
@@ -96,18 +96,21 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom }}
           ListHeaderComponent={
-            readOnlyReason || error ? (
-              <View className="gap-2 pb-3">
-                {readOnlyReason ? (
-                  <Text className="text-xs text-foreground-muted">{readOnlyReason}</Text>
-                ) : null}
-                {error ? (
-                  <Text selectable className="text-sm text-danger-foreground">
-                    {error}
-                  </Text>
-                ) : null}
-              </View>
-            ) : undefined
+            <>
+              {header}
+              {readOnlyReason || error ? (
+                <View className="gap-2 pb-3">
+                  {readOnlyReason ? (
+                    <Text className="text-xs text-foreground-muted">{readOnlyReason}</Text>
+                  ) : null}
+                  {error ? (
+                    <Text selectable className="text-sm text-danger-foreground">
+                      {error}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
           }
           renderItem={({ item, index }) => (
             <SelectionRow
@@ -142,7 +145,6 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
                       ? "Try another name."
                       : "Create labels on the provider to use them here.")
                   }
-                  variant="plain"
                 />
                 {result.error ? <Button label="Retry" onPress={result.refresh} /> : null}
               </View>

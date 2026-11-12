@@ -188,7 +188,6 @@ function NoVisibleFiles({ files }: { readonly files: ChangedFiles }) {
         title={diff.nextCursor ? "No non-test files loaded yet" : "Only test files changed"}
         detail="Test files are hidden from this review."
         action={<Button label="Show test files" tone="contrast" onPress={filter.showAll} />}
-        variant="plain"
       />
     ) : null;
   }

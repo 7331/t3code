@@ -360,9 +360,9 @@ export function ComposerToolbarButton(props: {
       disabled={props.disabled}
       onPress={props.onPress}
       className={cn(
-        "h-11 max-w-[172px] flex-row items-center justify-center rounded-full border active:opacity-70",
+        "h-11 max-w-[172px] flex-row items-center justify-center border active:opacity-70",
         variant === "primary" && "shadow-lg shadow-adaptive-black-a10-a25 disabled:shadow-none",
-        isCircle ? "w-11" : "gap-2 px-3.5",
+        isCircle ? "w-11 rounded-full" : "gap-2 rounded-[10px] px-3.5",
         variant === "primary"
           ? props.disabled
             ? "bg-subtle-strong"
@@ -405,7 +405,7 @@ export function ComposerToolbarButton(props: {
       {props.label ? (
         <Text
           className={cn(
-            "shrink text-center text-sm font-t3-bold",
+            "shrink text-center text-sm font-t3-medium",
             variant === "primary"
               ? props.disabled
                 ? "text-foreground-muted"

@@ -2,9 +2,9 @@ import { useAtomValue } from "@effect/atom-react";
 import { sortProjectsByGroupOrder } from "@t3tools/client-runtime/state/project-grouping";
 import type { ScopedProjectRef, SidebarProjectGroupingMode } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { Platform, ScrollView } from "react-native";
+import { Platform } from "react-native";
 import type { MenuProps } from "../../components/ui/Menu.types";
-import { ListFilterMenu } from "../layout/workspace/ListFilterMenu";
+import { ListFilterLens } from "../layout/workspace/ListFilterLens";
 import { environmentProjects } from "../../state/projects";
 import { environmentThreadShells } from "../../state/threads";
 import { useMobileProjectGroupingSettings } from "../../state/project-grouping";
@@ -27,11 +27,6 @@ const SORTS = {
   created: "Newest created",
   oldest: "Oldest updated",
 } as const;
-// A 12dp inset keeps 16dp chips concentric with Android's 28dp ScreenContent corner.
-const ROW_STYLE =
-  Platform.OS === "android"
-    ? { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8, gap: 8 }
-    : { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 10, gap: 8 };
 const id = (field: string, value: string) => JSON.stringify([field, value]);
 function choices(field: string, options: Readonly<Record<string, string>>, selected: string) {
   return Object.entries(options).map(([value, title]) => ({
@@ -89,8 +84,8 @@ export interface PullRequestFilterMenu {
 }
 
 /**
- * Builds the filter pills and, on Android, the header's full filter menu. The list screen owns
- * the call so both the pills and the header it frames read the same menu.
+ * Builds the list's filter menu: the lens above the list and, on Android, the header's filter
+ * button. The list screen owns the call so both read the same menu.
  */
 export function usePullRequestListFilters(props: {
   readonly environments: readonly { id: string; label: string }[];
@@ -307,111 +302,67 @@ export function usePullRequestListFilters(props: {
     ),
   ];
   const customized = count > 0 || value.sort !== "updated" || props.environmentId !== null;
-  // The Android header's filter button opens every filter.
+  // Every filter in one menu: the lens on iOS, the header's filter button on Android.
+  const allActions: MenuProps["actions"] = [
+    ...(props.environments.length > 1
+      ? [{ id: "environment", title: "Environment", subactions: environmentActions }]
+      : []),
+    { id: "state", title: "State", subactions: stateActions },
+    { id: "involvement", title: "Involvement", subactions: involvementActions },
+    { id: "labels", title: "Labels", subactions: labelActions },
+    { id: "author", title: "Author", subactions: authorActions },
+    ...more,
+    reset(true),
+  ];
   const headerMenu: PullRequestFilterMenu | null =
-    Platform.OS === "android"
-      ? {
-          actions: [
-            { id: "environment", title: "Environment", subactions: environmentActions },
-            { id: "state", title: "State", subactions: stateActions },
-            { id: "involvement", title: "Involvement", subactions: involvementActions },
-            { id: "labels", title: "Labels", subactions: labelActions },
-            { id: "author", title: "Author", subactions: authorActions },
-            ...more,
-            reset(true),
-          ],
-          onSelect: select,
-          customized,
-        }
-      : null;
+    Platform.OS === "android" ? { actions: allActions, onSelect: select, customized } : null;
   return {
     headerMenu,
+    allActions,
+    customized,
     select,
-    count,
-    more,
-    reset,
     environmentLabel:
       props.environments.length > 1
         ? (props.environments.find((environment) => environment.id === props.environmentId)
             ?.label ?? "All environments")
         : null,
-    environmentActions,
     state: value.state,
-    stateActions,
     involvement: value.involvement,
-    involvementActions,
     selectedLabelCount: selectedLabels.length,
-    labelActions,
     author,
-    authorActions,
   };
 }
 
+/** The pull request filters, as Portal's list lens: one glyph naming the current scope. */
 export function PullRequestListFilters(props: {
-  /** Android sidebar rows sit further in than full-width rows; the pills follow them. */
-  readonly sidebar?: boolean;
   readonly filters: ReturnType<typeof usePullRequestListFilters>;
+  /** Android draws the list in its sidebar without a sidebar pane. */
+  readonly sidebar?: boolean;
 }) {
-  const { count, more, reset, select, author, selectedLabelCount } = props.filters;
+  const { filters } = props;
+  const label = [
+    filters.environmentLabel !== null && filters.environmentLabel !== "All environments"
+      ? filters.environmentLabel
+      : null,
+    STATES[filters.state],
+    filters.involvement === "all" ? null : INVOLVEMENT[filters.involvement],
+    filters.author ? (filters.author === "me" ? "By you" : filters.author) : null,
+    filters.selectedLabelCount
+      ? `${filters.selectedLabelCount} ${filters.selectedLabelCount === 1 ? "label" : "labels"}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={{ overflow: "visible" }}
-      // In the Android sidebar the first pill lines up with the rows' content instead
-      // (8dp row margin + 12dp padding).
-      contentContainerStyle={
-        props.sidebar && Platform.OS === "android"
-          ? { ...ROW_STYLE, paddingHorizontal: 20 }
-          : ROW_STYLE
-      }
-    >
-      {Platform.OS === "android" ? null : (
-        <ListFilterMenu
-          label={count ? String(count) : "Filters"}
-          icon
-          active={count > 0}
-          accessibilityLabel={count ? `Filters, ${count} active` : "More filters"}
-          actions={[...more, reset(false)]}
-          onSelect={select}
-        />
-      )}
-      {props.filters.environmentLabel !== null ? (
-        <ListFilterMenu
-          label={props.filters.environmentLabel}
-          accessibilityLabel="Choose pull request environment"
-          actions={props.filters.environmentActions}
-          onSelect={select}
-        />
-      ) : null}
-      <ListFilterMenu
-        label={STATES[props.filters.state]}
-        active={props.filters.state !== "open"}
-        accessibilityLabel="Filter by state"
-        actions={props.filters.stateActions}
-        onSelect={select}
-      />
-      <ListFilterMenu
-        label={INVOLVEMENT[props.filters.involvement]}
-        active={props.filters.involvement !== "all"}
-        accessibilityLabel="Filter by involvement"
-        actions={props.filters.involvementActions}
-        onSelect={select}
-      />
-      <ListFilterMenu
-        label={selectedLabelCount ? `Labels ${selectedLabelCount}` : "Labels"}
-        active={selectedLabelCount > 0}
-        accessibilityLabel="Filter by label"
-        actions={props.filters.labelActions}
-        onSelect={select}
-      />
-      <ListFilterMenu
-        label={author === "me" ? "By you" : (author ?? "Author")}
-        active={Boolean(author)}
-        accessibilityLabel="Filter by author"
-        actions={props.filters.authorActions}
-        onSelect={select}
-      />
-    </ScrollView>
+    <ListFilterLens
+      title="Filter pull requests"
+      sidebar={props.sidebar}
+      label={label}
+      active={filters.customized}
+      actions={filters.allActions}
+      onSelect={filters.select}
+      onClear={() => filters.select(JSON.stringify(["reset", "environment"]))}
+      clearAccessibilityLabel="Reset pull request filters"
+    />
   );
 }

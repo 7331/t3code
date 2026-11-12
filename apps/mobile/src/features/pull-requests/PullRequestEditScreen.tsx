@@ -164,8 +164,8 @@ export function PullRequestEditScreen({ route }: StaticScreenProps<PullRequestEd
         onSubmitEditing={params.field === "title" ? () => void save() : undefined}
         className={
           params.field === "title"
-            ? "min-h-12 rounded-[20px] bg-grouped-card px-4 text-base text-foreground"
-            : "min-h-48 rounded-[20px] bg-grouped-card p-4 text-base text-foreground"
+            ? "min-h-12 rounded-[10px] bg-grouped-card px-4 text-base text-foreground"
+            : "min-h-48 rounded-[10px] bg-grouped-card p-4 text-base text-foreground"
         }
         style={params.field === "title" ? undefined : { textAlignVertical: "top" }}
       />

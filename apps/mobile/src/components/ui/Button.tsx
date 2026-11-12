@@ -25,6 +25,7 @@ const TONE_CLASS_NAMES = {
   text: ["bg-transparent", "text-primary-text"],
 } as const;
 
+/** Portal's button: a 44-point rounded rectangle on touch screens, not a pill. */
 export function Button(props: ButtonProps) {
   const [containerClassName, labelClassName] = TONE_CLASS_NAMES[props.tone ?? "secondary"];
   const disabled = Boolean(props.disabled || props.loading);
@@ -37,8 +38,8 @@ export function Button(props: ButtonProps) {
       disabled={disabled}
       onPress={props.onPress}
       className={cn(
-        "flex-row items-center justify-center gap-2 rounded-full active:opacity-70",
-        props.size === "compact" ? "min-h-10 px-5" : "min-h-12 px-6",
+        "min-h-11 flex-row items-center justify-center gap-2 rounded-[10px] active:opacity-70",
+        props.size === "compact" ? "px-3" : "px-4",
         props.fullWidth ? "w-full" : "self-start",
         disabled ? "bg-subtle-strong" : containerClassName,
       )}

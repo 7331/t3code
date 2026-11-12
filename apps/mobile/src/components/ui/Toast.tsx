@@ -46,7 +46,7 @@ export function Toast(props: ToastProps) {
 function ToastContent(props: ToastProps & { readonly glassReady?: boolean }) {
   const { fontScale } = useWindowDimensions();
   const { colorScheme } = useControlTheme();
-  const borderRadius = Platform.OS === "ios" ? 28 : MOBILE_SHAPE.toast;
+  const borderRadius = MOBILE_SHAPE.toast;
   // Explicit single-line notices reserve the action's width and truncate the text.
   const inlineAction = props.singleLine || (!props.description && fontScale < 1.5);
   const message =
@@ -68,7 +68,6 @@ function ToastContent(props: ToastProps & { readonly glassReady?: boolean }) {
     <GlassSurface
       key={props.glassReady === false ? "entering" : "settled"}
       chrome={Platform.OS === "ios" && colorScheme === "dark" ? "none" : undefined}
-      tintColor={Platform.OS === "ios" ? null : undefined}
       className={Platform.OS === "ios" ? "bg-transparent p-2" : "p-3"}
       style={{ borderRadius }}
     >

@@ -24,7 +24,7 @@ export function ListToggleRow(
             accessibilityHint={props.description}
             accessibilityState={{ disabled: Boolean(props.disabled) }}
             disabled={props.disabled}
-            className="rounded-full bg-subtle px-3 py-2 active:opacity-70"
+            className="min-h-11 justify-center rounded-[10px] bg-subtle px-3 active:opacity-70"
             onPress={() => props.onValueChange(true)}
           >
             <AppText className="text-sm font-t3-medium text-foreground">Mixed · Set on</AppText>

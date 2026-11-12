@@ -1,5 +1,7 @@
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { useSearchToolbarInset } from "../../components/ui/useBarInset";
+import { PortalListSearch } from "../../components/ui/PortalListSearch";
+import { cn } from "../../lib/cn";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { LegendList } from "@legendapp/list/react-native";
 import { type StaticScreenProps, useNavigation } from "@react-navigation/native";
@@ -31,12 +33,21 @@ function useMobileThirdPartyLicenses() {
   }, []);
 }
 
+/** One package in the grouped license card: hairlines between rows, rounded at the ends. */
 function LicenseRow(props: {
   readonly entry: ThirdPartyLicenseEntry;
+  readonly first: boolean;
+  readonly last: boolean;
   readonly onPress: () => void;
 }) {
   return (
-    <View className="border-b border-border">
+    <View
+      className={cn(
+        "mx-4 overflow-hidden",
+        props.first && "rounded-t-2xl",
+        props.last ? "rounded-b-2xl" : "border-b border-border-subtle",
+      )}
+    >
       <ListRow
         label={props.entry.name}
         description={[props.entry.version, props.entry.license].filter(Boolean).join(" · ")}
@@ -61,9 +72,17 @@ export function SettingsOpenSourceLicensesRouteScreen() {
   const manifest = useMobileThirdPartyLicenses();
   const entries = manifest?.entries ?? [];
   const filteredEntries = filterThirdPartyLicenseEntries(entries, query);
-  const renderItem = ({ item }: { readonly item: ThirdPartyLicenseEntry }) => (
+  const renderItem = ({
+    item,
+    index,
+  }: {
+    readonly item: ThirdPartyLicenseEntry;
+    readonly index: number;
+  }) => (
     <LicenseRow
       entry={item}
+      first={index === 0}
+      last={index === filteredEntries.length - 1}
       onPress={() =>
         navigation.navigate("SettingsOpenSourceLicense", {
           entryKey: thirdPartyLicenseEntryKey(item),
@@ -99,6 +118,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         keyExtractor={thirdPartyLicenseEntryKey}
+        ListHeaderComponent={<PortalListSearch search={search} className="px-4 pb-2 pt-2" />}
         ListEmptyComponent={
           <View className="items-center px-6 py-12">
             <Text className="text-center text-base text-foreground-muted">
@@ -170,7 +190,7 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
           ) : null}
         </View>
 
-        <View className="overflow-hidden rounded-[24px] border-continuous bg-grouped-card p-4">
+        <View className="overflow-hidden rounded-2xl border-continuous bg-grouped-card p-4">
           <Text selectable className="font-mono text-base leading-normal text-foreground">
             {entry.noticeText}
           </Text>

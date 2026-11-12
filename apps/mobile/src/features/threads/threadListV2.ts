@@ -650,7 +650,7 @@ export function buildThreadListV2ListItems(input: {
 /**
  * Groups the list by project: each run of thread rows (above the shelves and inside each shelf)
  * splits into one group per project, in the order of each project's first row, under a project
- * header. Grouping reorders rows, so manual moves are off while it is on.
+ * header, with no dividers between rows. Grouping reorders rows, so manual moves are off.
  */
 export function groupThreadListV2ItemsByProject(
   items: ReadonlyArray<ThreadListV2ListItem>,
@@ -676,14 +676,14 @@ export function groupThreadListV2ItemsByProject(
         projectId: first.projectId,
         count: group.length,
       });
-      group.forEach((entry, index) => {
-        const showTrailingDivider = index < group.length - 1;
+      for (const entry of group) {
+        // Portal's lists draw no dividers between rows; the project header separates groups.
         result.push(
-          entry.canMoveUp || entry.canMoveDown || entry.showTrailingDivider !== showTrailingDivider
-            ? { ...entry, canMoveUp: false, canMoveDown: false, showTrailingDivider }
+          entry.canMoveUp || entry.canMoveDown || entry.showTrailingDivider
+            ? { ...entry, canMoveUp: false, canMoveDown: false, showTrailingDivider: false }
             : entry,
         );
-      });
+      }
     }
     run = [];
   };

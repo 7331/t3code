@@ -307,7 +307,7 @@ function Discussion({ params }: { params: PullRequestParams & { readonly discuss
                 value={body}
                 onChangeText={setBody}
                 editable={!busy}
-                className="max-h-36 min-h-12 min-w-0 flex-1 rounded-[24px] border-0 bg-transparent px-4 py-3 text-base text-foreground"
+                className="max-h-36 min-h-12 min-w-0 flex-1 rounded-2xl border-0 bg-transparent px-4 py-3 text-base text-foreground"
               />
               <View>
                 <Button
