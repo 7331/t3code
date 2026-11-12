@@ -17,13 +17,17 @@ export function withNativeGlassHeaderItem<T extends NativeGlassHeaderItem>(
     readonly width?: number;
   } = {},
 ): T {
-  const sharesBackground = options.sharesBackground ?? item.sharesBackground ?? true;
+  // The fork's bar buttons are bare glyphs: no shared capsule background unless
+  // a filled variant (done, prominent) explicitly asks for one.
+  const sharesBackground = options.sharesBackground ?? item.sharesBackground ?? false;
+  const variant = item.variant ?? "plain";
   return {
     ...item,
     glassEffect: item.glassEffect ?? false,
-    hidesSharedBackground: options.hidesSharedBackground ?? item.hidesSharedBackground ?? false,
+    hidesSharedBackground:
+      options.hidesSharedBackground ?? item.hidesSharedBackground ?? variant === "plain",
     sharesBackground,
-    variant: item.variant ?? "plain",
+    variant,
     width: options.width ?? item.width,
   } as T;
 }

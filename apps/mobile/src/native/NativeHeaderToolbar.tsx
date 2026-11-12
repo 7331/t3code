@@ -188,7 +188,8 @@ function convertToolbarChild(
         title: typeof child.props.title === "string" ? child.props.title : undefined,
         items: collectMenuItems(child.props.children, register),
       },
-      sharesBackground: !child.props.separateBackground,
+      // The fork's toolbar buttons are bare glyphs, never grouped in a capsule.
+      sharesBackground: false,
       tintColor: child.props.tintColor as ColorValue | undefined,
       variant:
         child.props.variant === "done" || child.props.variant === "prominent"

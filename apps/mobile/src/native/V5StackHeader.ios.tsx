@@ -99,6 +99,15 @@ function convertMenu(menu: MenuInput, id: string): StackHeaderMenuIOS {
   return { id, type: "menu", title: menu.title, children };
 }
 
+// The fork's bar buttons are bare glyphs: the shared capsule background goes
+// away for plain items, filled variants keep theirs.
+function hidesSharedBackgroundFor(item: {
+  readonly hidesSharedBackground?: boolean;
+  readonly variant?: "plain" | "done" | "prominent";
+}): boolean | undefined {
+  return item.hidesSharedBackground ?? (item.variant !== "done" && item.variant !== "prominent");
+}
+
 function convertItems(items: NativeStackHeaderItem[], prefix: string): HeaderItem[] {
   return items.map((item, index): HeaderItem => {
     const id =
@@ -127,7 +136,7 @@ function convertItems(items: NativeStackHeaderItem[], prefix: string): HeaderIte
           disabled: item.disabled,
           variant: item.variant,
           tintColor: item.tintColor,
-          hidesSharedBackground: item.hidesSharedBackground,
+          hidesSharedBackground: hidesSharedBackgroundFor(item),
         };
       case "button":
         return {
@@ -143,7 +152,7 @@ function convertItems(items: NativeStackHeaderItem[], prefix: string): HeaderIte
             item.visibilityPriority === "default" ? "standard" : item.visibilityPriority,
           variant: item.variant,
           tintColor: item.tintColor,
-          hidesSharedBackground: item.hidesSharedBackground,
+          hidesSharedBackground: hidesSharedBackgroundFor(item),
         };
     }
   });

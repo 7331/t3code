@@ -1,10 +1,7 @@
-import { useAtomValue } from "@effect/atom-react";
 import { NavigationContext } from "@react-navigation/native";
 import type { SkyMember } from "@t3tools/shared/ambientSky/skyClock";
 import { sowStars } from "@t3tools/shared/ambientSky/starField";
 import { windRows } from "@t3tools/shared/ambientSky/windField";
-import { PORTAL_THEME_ID } from "@t3tools/shared/themePalettes";
-import { AsyncResult } from "effect/reactivity";
 import {
   createContext,
   use,
@@ -18,9 +15,8 @@ import {
 import { Platform, Text, View, type LayoutChangeEvent } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 
-import { useReduceMotionEnabled } from "../../../lib/appState";
-import { mobilePreferencesAtom } from "../../../state/preferences";
 import { useAppearancePreferences } from "../../settings/appearance/AppearancePreferencesProvider";
+import { useReduceMotionEnabled } from "../../../lib/appState";
 import { sharedSkyClock } from "./skyClock";
 import {
   measureSkyClearance,
@@ -78,14 +74,10 @@ function notifyClearRegistry(registry: SkyClearRegistry): void {
   for (const listener of registry.listeners) listener();
 }
 
-function useAmbientSkyShown(): boolean {
-  const { themeId } = useAppearancePreferences();
-  const preferences = useAtomValue(mobilePreferencesAtom);
-  return (
-    themeId === PORTAL_THEME_ID &&
-    AsyncResult.isSuccess(preferences) &&
-    preferences.value.ambientSkyEnabled !== false
-  );
+// The fork keeps the sky on: Portal is the only look, and the sky still holds
+// still under reduced motion and pauses off-screen on its own.
+function isAmbientSkyShown(): boolean {
+  return true;
 }
 
 function useScreenFocused(): boolean {
@@ -116,7 +108,7 @@ export function AmbientSkyBackdrop(props: {
     views: new Set(),
     listeners: new Set(),
   }));
-  const shown = useAmbientSkyShown();
+  const shown = isAmbientSkyShown();
   return (
     <SkyClearContext value={shown ? registry : null}>
       {shown ? <AmbientSkyLayer isStill={props.isStill === true} registry={registry} /> : null}
