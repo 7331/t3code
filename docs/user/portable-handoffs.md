@@ -1,7 +1,9 @@
 # Context in portable handoffs
 
 T3 Code transfers conversation context when you switch providers, continue through a portable
-restart, or use a fork that the provider cannot resume itself.
+restart, or use a fork that the provider cannot resume itself. After a provider compacts the
+conversation, your next message also carries the saved history, so the agent sees recent messages
+word for word instead of only the provider's summary.
 
 Short conversations transfer intact. For longer conversations, T3 Code favors recent requests and
 answers, the original request, and relevant activity such as command outcomes. Selected messages
