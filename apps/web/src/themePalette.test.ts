@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { converter } from "culori/fn";
-import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
 
 import { CONTEXT_CHIP_ACCENTS, contextChipColorVariable } from "./lib/contextChipAccents";
 
 import {
   applyThemePalette,
+  BUILT_IN_THEME_DEFINITIONS,
+  PORTAL_THEME,
   contextChipVariables,
   getThemeColorsForMode,
   getThemeModes,
@@ -82,7 +83,10 @@ describe("theme files", () => {
     const palettes = [
       getStandardThemeColors("light"),
       getStandardThemeColors("dark"),
-      ...BUILT_IN_THEMES.flatMap((theme) => [theme.colors, ...Object.values(theme.variants ?? {})]),
+      ...BUILT_IN_THEME_DEFINITIONS.flatMap((theme) => [
+        theme.colors,
+        ...Object.values(theme.variants ?? {}),
+      ]),
     ];
     for (const colors of palettes) {
       expect(
@@ -98,6 +102,28 @@ describe("theme files", () => {
         expect(distance(colors.searchMatchBackground, background)).toBeGreaterThan(0.08);
         expect(distance(colors.searchMatchActiveBackground, background)).toBeGreaterThan(0.08);
       }
+    }
+  });
+
+  it.each(["light", "dark"] as const)("keeps the Portal %s palette readable", (mode) => {
+    const colors = getThemeColorsForMode(PORTAL_THEME, mode)!;
+    const pairs = [
+      [colors.text, colors.canvas],
+      [colors.textMuted, colors.canvas],
+      [colors.mutedForeground, colors.muted],
+      [colors.placeholder, colors.surfaceRaised],
+      [colors.accentForeground, colors.accent],
+      [colors.messageActionForeground, colors.messageAction],
+      [colors.messageForeground, colors.messageSurface],
+      [colors.secondaryForeground, colors.secondary],
+      [colors.sidebarForeground, colors.sidebarRowSelected],
+      [colors.sidebarMutedForeground, colors.sidebar],
+      [colors.errorForeground, colors.errorSurface],
+      [colors.warningForeground, colors.warningSurface],
+      [colors.updateForeground, colors.updateSurface],
+    ] as const;
+    for (const [foreground, background] of pairs) {
+      expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
@@ -602,7 +628,7 @@ describe("context chip colors", () => {
   const palettes = [
     getStandardThemeColors("light"),
     getStandardThemeColors("dark"),
-    ...BUILT_IN_THEMES.flatMap((theme) =>
+    ...BUILT_IN_THEME_DEFINITIONS.flatMap((theme) =>
       getThemeModes(theme).map((mode) => getThemeColorsForMode(theme, mode)!),
     ),
   ];
