@@ -116,6 +116,7 @@ function makeTestAdapter(input: {
   readonly failedRunOrdinals?: ReadonlySet<number>;
   readonly interruptedRunOrdinals?: ReadonlySet<number>;
   readonly cancelledRunOrdinals?: ReadonlySet<number>;
+  readonly compactionByRunOrdinal?: Readonly<Record<number, "completed" | "failed">>;
   readonly holdRunOrdinal?: number;
   readonly pendingBackgroundWork?: Ref.Ref<boolean>;
   readonly subagentOnlyBackgroundWork?: boolean;
@@ -304,6 +305,7 @@ function makeTestAdapter(input: {
                 input.responseByThreadId?.[turnInput.threadId]?.[turnInput.runOrdinal] ??
                 input.responseByRunOrdinal[turnInput.runOrdinal] ??
                 `${input.driver} response for run ${turnInput.runOrdinal}`;
+              const compaction = input.compactionByRunOrdinal?.[turnInput.runOrdinal];
               const providerEvents: ReadonlyArray<ProviderAdapter.ProviderAdapterV2Event> = [
                 {
                   type: "provider_turn.updated",
@@ -324,6 +326,34 @@ function makeTestAdapter(input: {
                     completedAt: eventTime,
                   },
                 },
+                ...(compaction === undefined
+                  ? []
+                  : [
+                      {
+                        type: "turn_item.updated" as const,
+                        driver: input.driver,
+                        turnItem: {
+                          id: TurnItemId.make(
+                            `turn-item:${input.driver}:${turnInput.threadId}:${turnInput.runOrdinal}:compaction`,
+                          ),
+                          threadId: turnInput.threadId,
+                          runId: turnInput.runId,
+                          nodeId: turnInput.rootNodeId,
+                          providerThreadId: turnInput.providerThread.id,
+                          providerTurnId,
+                          nativeItemRef: null,
+                          parentItemId: null,
+                          ordinal: turnInput.runOrdinal * 100 + 3,
+                          status: compaction,
+                          title: null,
+                          startedAt: eventTime,
+                          completedAt: eventTime,
+                          updatedAt: eventTime,
+                          type: "compaction" as const,
+                          driver: input.driver,
+                        },
+                      },
+                    ]),
                 {
                   type: "turn_item.updated",
                   driver: input.driver,
@@ -1328,6 +1358,166 @@ describe("orchestration v2 provider switching", () => {
         );
       }),
     ),
+  );
+
+  it.live.each(["completed", "queued", "provider switch", "failed", "fresh context"] as const)(
+    "replays recent chat verbatim once after a compaction: %s",
+    (scenario) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const key = scenario.replace(" ", "-");
+          const cwd = yield* checkpointWorkspace(`compaction-replay-${key}`);
+          const capturedTurns = yield* Ref.make<ReadonlyArray<CapturedTurn>>([]);
+          const started = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          const queued = scenario === "queued";
+          const switched = scenario === "provider switch";
+          const layerRegistry = ProviderAdapterRegistry.layerFromAdapters([
+            makeTestAdapter({
+              instanceId: CLAUDE_MODEL_SELECTION.instanceId,
+              driver: CLAUDE_DRIVER,
+              capabilities: ClaudeProviderCapabilitiesV2,
+              modelSelection: CLAUDE_MODEL_SELECTION,
+              responseByRunOrdinal: { 1: "First answer" },
+              compactionByRunOrdinal: { 2: scenario === "failed" ? "failed" : "completed" },
+              capturedTurns,
+              ...(queued
+                ? { holdFirstTurn: started, releaseFirstTurn: release, holdRunOrdinal: 2 }
+                : {}),
+            }),
+            makeTestAdapter({
+              instanceId: CODEX_MODEL_SELECTION.instanceId,
+              driver: CODEX_DRIVER,
+              capabilities: CodexProviderCapabilitiesV2,
+              modelSelection: CODEX_MODEL_SELECTION,
+              responseByRunOrdinal: {},
+              capturedTurns,
+            }),
+          ]);
+          const replayThreadId = ThreadId.make(`thread:compaction-replay:${key}`);
+          yield* Effect.gen(function* () {
+            const orchestrator = yield* Orchestrator.OrchestratorV2;
+            const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+            const send = (
+              text: string,
+              modelSelection: ModelSelection,
+              options: {
+                readonly freshContext?: boolean;
+                readonly dispatchMode?: Extract<
+                  OrchestrationV2Command,
+                  { readonly type: "message.dispatch" }
+                >["dispatchMode"];
+              } = {},
+            ) =>
+              orchestrator.dispatch({
+                type: "message.dispatch",
+                createdBy: "user",
+                creationSource: "web",
+                commandId: CommandId.make(`command:compaction-replay:${key}:${text}`),
+                threadId: replayThreadId,
+                messageId: MessageId.make(`message:compaction-replay:${key}:${text}`),
+                text,
+                attachments: [],
+                modelSelection,
+                dispatchMode: { type: "start_immediately" },
+                ...options,
+              });
+            const settle = Effect.fn("settle")(function* () {
+              yield* worker.drain();
+              yield* waitForIdle(replayThreadId);
+            });
+            yield* orchestrator.dispatch({
+              type: "thread.create",
+              createdBy: "user",
+              creationSource: "web",
+              commandId: CommandId.make(`command:compaction-replay:${key}:create`),
+              threadId: replayThreadId,
+              projectId: ProjectId.make(`project:compaction-replay:${key}`),
+              title: "Compaction replay",
+              modelSelection: CLAUDE_MODEL_SELECTION,
+              runtimeMode: "full-access",
+              interactionMode: "default",
+              branch: null,
+              worktreePath: cwd,
+            });
+            yield* send("First request", CLAUDE_MODEL_SELECTION);
+            yield* settle();
+            yield* send("Second request", CLAUDE_MODEL_SELECTION);
+            if (queued) {
+              yield* Deferred.await(started);
+              yield* worker.drain();
+              yield* send("Target request", CLAUDE_MODEL_SELECTION, {
+                dispatchMode: { type: "queue_after_active" },
+              });
+              yield* Deferred.succeed(release, undefined);
+            }
+            yield* settle();
+            if (switched) {
+              yield* send("Elsewhere request", CODEX_MODEL_SELECTION);
+              yield* settle();
+            }
+            if (!queued) {
+              yield* send("Target request", CLAUDE_MODEL_SELECTION, {
+                freshContext: scenario === "fresh context",
+              });
+              yield* settle();
+            }
+            yield* send("Follow-up request", CLAUDE_MODEL_SELECTION);
+            yield* settle();
+
+            const projection = yield* orchestrator.getThreadProjection(replayThreadId);
+            const runFor = (text: string) =>
+              projection.runs.find(
+                (run) => run.userMessageId === `message:compaction-replay:${key}:${text}`,
+              )!;
+            const handoffsFor = (text: string) =>
+              projection.contextHandoffs.filter(
+                (handoff) => handoff.targetRunId === runFor(text).id,
+              );
+            const turns = yield* Ref.get(capturedTurns);
+            const textFor = (text: string) => turns.find((turn) => turn.text.endsWith(text))!.text;
+            const target = runFor("Target request");
+            assert.isTrue(projection.runs.every((run) => run.status === "completed"));
+
+            if (scenario === "failed" || scenario === "fresh context") {
+              assert.deepEqual(handoffsFor("Target request"), []);
+              assert.equal(textFor("Target request"), "Target request");
+            } else {
+              const [handoff, ...others] = handoffsFor("Target request");
+              assert.deepEqual(others, []);
+              assert.equal(handoff?.strategy, "full_thread_summary");
+              assert.deepEqual(handoff?.coveredRunOrdinals, { from: 1, to: target.ordinal - 1 });
+              const replayed = textFor("Target request");
+              for (const earlier of ["First request", "First answer", "Second request"]) {
+                assert.include(replayed, earlier);
+              }
+              // The compaction row already marks the moment; a same-provider handoff row would read Claude to Claude.
+              assert.equal(
+                projection.turnItems.some(
+                  (item) => item.type === "handoff" && item.runId === target.id,
+                ),
+                switched,
+              );
+            }
+            assert.deepEqual(handoffsFor("Follow-up request"), []);
+            assert.equal(textFor("Follow-up request"), "Follow-up request");
+          }).pipe(
+            Effect.provide(
+              ProviderReplayHarness.layerWithRegistry(
+                {
+                  name: `compaction-replay-${key}`,
+                  runtimePolicyOverride: {
+                    cwd,
+                    approvalPolicy: "never",
+                    sandboxPolicy: { type: "readOnly" },
+                  },
+                },
+                layerRegistry,
+              ),
+            ),
+          );
+        }),
+      ),
   );
 
   it.live.each(["native", "legacy"] as const)(
