@@ -96,8 +96,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** `<any>` inside a string stands for any text between the fixed parts, which keep their order. */
+function replayStringMatches(expected: string, actual: string): boolean {
+  const parts = expected.split(PI_REPLAY_ANY);
+  if (parts.length === 1) return expected === actual;
+  const first = parts[0]!;
+  const last = parts.at(-1)!;
+  if (!actual.startsWith(first) || !actual.endsWith(last)) return false;
+  let offset = first.length;
+  for (const part of parts.slice(1, -1)) {
+    const index = actual.indexOf(part, offset);
+    if (index === -1) return false;
+    offset = index + part.length;
+  }
+  return offset <= actual.length - last.length;
+}
+
 function replayValueMatches(expected: unknown, actual: unknown): boolean {
   if (expected === PI_REPLAY_ANY) return true;
+  if (typeof expected === "string" && typeof actual === "string") {
+    return replayStringMatches(expected, actual);
+  }
   if (Array.isArray(expected)) {
     return (
       Array.isArray(actual) &&
