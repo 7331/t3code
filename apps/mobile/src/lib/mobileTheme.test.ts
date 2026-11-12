@@ -17,13 +17,13 @@ import { getMobileThemeRuntimeVariables } from "./mobileThemeVariables";
 import {
   createMobileThemeSelectionPatch,
   createMobileThemeVariables,
-  DEFAULT_MOBILE_THEME_ID,
   flattenThemeColor,
   getMobileThemeVariables,
   resolveMobileThemeIds,
   themeColorWithAlpha,
   themeColorToNativeColor,
 } from "./mobileTheme";
+import { PORTAL_THEME_ID } from "@t3tools/shared/themePalettes";
 
 function relativeLuminance(hex: string): number {
   const channels = hex
@@ -76,7 +76,7 @@ describe("mobile themes", () => {
           ? T3_CODE_DARK_THEME_COLORS
           : T3_CODE_LIGHT_THEME_COLORS;
       const variables =
-        themeId === DEFAULT_MOBILE_THEME_ID
+        themeId === MOBILE_THEME_IDS[0]
           ? readDefaultMobileThemeVariables(appearance)
           : getMobileThemeVariables(themeId, appearance);
       expect(variables["--color-screen"]).toBe(themeColorToNativeColor(colors.canvas));
@@ -96,7 +96,7 @@ describe("mobile themes", () => {
         themeColorToNativeColor(colors.sidebarForeground),
       );
       expect(variables["--color-primary"]).toBe(themeColorToNativeColor(colors.messageAction));
-      if (themeId !== DEFAULT_MOBILE_THEME_ID) {
+      if (themeId !== MOBILE_THEME_IDS[0]) {
         expect(variables["--color-user-bubble"]).toBe(
           themeColorToNativeColor(colors.messageSurface),
         );
@@ -162,7 +162,7 @@ describe("mobile themes", () => {
   it.each(MOBILE_THEME_IDS)("separates %s filled groups from their sheets", (themeId) => {
     for (const appearance of ["light", "dark"] as const) {
       const generated = readGeneratedMobileThemeVariables(
-        themeId === DEFAULT_MOBILE_THEME_ID ? appearance : `${themeId}-${appearance}`,
+        themeId === MOBILE_THEME_IDS[0] ? appearance : `${themeId}-${appearance}`,
       );
       expect(generated).toEqual(getMobileThemeVariables(themeId, appearance));
       for (const platform of ["ios", "android"]) {
@@ -224,18 +224,14 @@ describe("mobile themes", () => {
     }
   });
 
-  it("migrates one theme choice to both appearances and preserves independent choices", () => {
+  it("always resolves to Portal regardless of stored choices", () => {
     expect(resolveMobileThemeIds({ themeId: "grove" })).toEqual({
-      light: "grove",
-      dark: "grove",
+      light: PORTAL_THEME_ID,
+      dark: PORTAL_THEME_ID,
     });
     expect(
       resolveMobileThemeIds({ themeId: "grove", lightThemeId: "iris", darkThemeId: "ocean" }),
-    ).toEqual({ light: "iris", dark: "ocean" });
-    expect(resolveMobileThemeIds({ themeId: "grove", lightThemeId: "missing" })).toEqual({
-      light: DEFAULT_MOBILE_THEME_ID,
-      dark: "grove",
-    });
+    ).toEqual({ light: PORTAL_THEME_ID, dark: PORTAL_THEME_ID });
   });
 
   it("changes either theme without switching the active appearance", () => {
