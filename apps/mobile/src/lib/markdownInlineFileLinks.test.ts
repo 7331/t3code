@@ -96,7 +96,8 @@ describe("inline code that names a file", () => {
   });
 
   it("keeps commands, identifiers and URLs as code", () => {
-    const markdown = "Run `vp test run`, call `useMemo`, open `https://example.com/a.ts`.";
+    const markdown =
+      "Run `vp test run`, call `useMemo`, open `https://example.com/a.ts`, pair `100.82.4.108:3783` or `localhost:5173`.";
     expect(rewrite(markdown)).toBe(markdown);
   });
 

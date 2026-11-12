@@ -21,6 +21,7 @@ import { useAppearancePreferences } from "../../features/settings/appearance/App
 import type { AppBarMenuItem, AppBarProps } from "./AppBar.types";
 import type { AppSymbolName } from "./AppSymbol";
 import { useNativeMailSearchToolbar } from "../../native/use-native-mail-search-toolbar";
+import { usePortalPhoneShell } from "../../features/portal/shell/usePortalPhoneShell";
 import { useControlTheme } from "./useControlTheme";
 
 function iosIcon(icon: AppSymbolName) {
@@ -76,10 +77,14 @@ export function AppBar(props: AppBarProps) {
   const { themeVariables } = useAppearancePreferences();
   const { colors } = useControlTheme();
   const usesNativeMailSearchToolbar = useNativeMailSearchToolbar();
+  // Portal keeps a list's search field at the top of the list, never in a capsule floating
+  // over its end, so the phone shell stacks it under the title instead of the mail toolbar.
+  const portalPhoneShell = usePortalPhoneShell();
   const { search, menus } = props;
   const menu = menus?.[0];
   const compactSearch =
     search !== undefined &&
+    !portalPhoneShell &&
     (search.compactToolbar ?? !layout.usesSplitView) &&
     usesNativeMailSearchToolbar;
   const visibleMenus = compactSearch ? (menus?.slice(1) ?? []) : (menus ?? []);
@@ -130,12 +135,14 @@ export function AppBar(props: AppBarProps) {
                 headerSearchBarOptions: compactSearch
                   ? undefined
                   : {
-                      allowToolbarIntegration: true,
-                      ...(duoBottomSearch
-                        ? { placement: "integrated" as const }
-                        : NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED && search.mode === "inline"
-                          ? { placement: "integratedButton" as const }
-                          : undefined),
+                      allowToolbarIntegration: !portalPhoneShell,
+                      ...(portalPhoneShell
+                        ? { placement: "stacked" as const, hideWhenScrolling: false }
+                        : duoBottomSearch
+                          ? { placement: "integrated" as const }
+                          : NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED && search.mode === "inline"
+                            ? { placement: "integratedButton" as const }
+                            : undefined),
                       autoCapitalize: "none",
                       hideNavigationBar: false,
                       ...(search.mode === "inline" || duoBottomSearch
@@ -227,9 +234,9 @@ export function AppBar(props: AppBarProps) {
               </View>
             </Toolbar.Custom>
           ) : props.confirm ? (
+            // Portal confirms with its word ("Save", "Done") in the accent, not a filled glass circle.
             <Toolbar.Button
-              icon="checkmark"
-              variant="prominent"
+              label={props.confirm.label}
               visibilityPriority="high"
               tintColor={colors["--color-prominent-action"]}
               accessibilityLabel={props.confirm.label}

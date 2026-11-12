@@ -87,7 +87,10 @@ import {
   classifyMarkdownImageSource,
   markdownImageSourceFragment,
 } from "@t3tools/client-runtime/markdown-images";
-import { resolveViewedImageAsset } from "@t3tools/client-runtime/work-log/presentation";
+import {
+  markdownLinePlainText,
+  resolveViewedImageAsset,
+} from "@t3tools/client-runtime/work-log/presentation";
 import {
   renderCodexInlineDirectivesAsMarkdown,
   splitCodexArtifactTemplateMarkdown,
@@ -444,12 +447,8 @@ function AssistantForkButton(props: {
           })
           .finally(() => setBusy(false));
       }}
-      className="h-7 w-7 items-center justify-center disabled:opacity-40"
-      style={
-        Platform.OS === "android"
-          ? { width: props.buttonSize, height: props.buttonSize }
-          : undefined
-      }
+      className="items-center justify-center disabled:opacity-40"
+      style={{ width: props.buttonSize, height: props.buttonSize }}
     >
       {busy ? (
         <AppActivityIndicator size="small" />
@@ -2054,12 +2053,11 @@ function renderFeedEntry(
                   environmentId={senderRef?.environmentId ?? props.environmentId}
                   senderThreadId={senderRef?.threadId}
                   {...(message.linkedSender ? { senderTitle: message.linkedSender.title } : {})}
-                  summary={
+                  summary={markdownLinePlainText(
                     replaceComposerContextReferences(presentation.text, (ref) => ref.label)
                       .split(/\r?\n/)
-                      .find((line) => line.trim().length > 0)
-                      ?.trim() ?? ""
-                  }
+                      .find((line) => line.trim().length > 0) ?? "",
+                  )}
                   expanded={foldExpanded}
                   onToggle={() => props.onToggleWorkRow(foldRowId, entry.id)}
                   iconSubtleColor={iconSubtleColor}
@@ -2814,7 +2812,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     () =>
       Platform.OS === "android"
         ? { button: androidButtonSize, icon: androidIconSize }
-        : { button: 28, icon: 13 },
+        : { button: 32, icon: 16 },
     [androidButtonSize, androidIconSize],
   );
   const screenColor = theme["--color-screen"];

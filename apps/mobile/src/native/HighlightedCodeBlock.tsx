@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Pressable, ScrollView, Text } from "react-native";
 import type { MarkdownStyle } from "react-native-enriched-markdown";
 
@@ -46,7 +45,6 @@ export function HighlightedCodeBlock(props: {
   readonly codeStyle: NonNullable<MarkdownStyle["codeBlock"]>;
 }) {
   const { code, codeStyle, textStyle } = props;
-  const [wrapped, setWrapped] = useState(false);
   const lines = useMarkdownCodeHighlight({
     code,
     language: props.language,
@@ -103,35 +101,22 @@ export function HighlightedCodeBlock(props: {
       label={FENCE_DISPLAY_NAMES[fence] ?? fence.charAt(0).toUpperCase() + fence.slice(1)}
       textStyle={textStyle}
       actions={
-        <>
-          <CodeBlockHeaderButton
-            icon="text.alignleft"
-            label={wrapped ? "Disable line wrap" : "Wrap lines"}
-            textStyle={textStyle}
-            active={wrapped}
-            onPress={() => setWrapped((value) => !value)}
-          />
-          <CodeBlockHeaderButton
-            icon="doc.on.doc"
-            label="Copy code"
-            textStyle={textStyle}
-            onPress={() => copyTextWithHaptic(code)}
-          />
-        </>
+        <CodeBlockHeaderButton
+          icon="doc.on.doc"
+          label="Copy code"
+          textStyle={textStyle}
+          onPress={() => copyTextWithHaptic(code)}
+        />
       }
     >
-      {wrapped ? (
-        content
-      ) : (
-        <ScrollView
-          horizontal
-          // As in the thread feed: with the keyboard open, the first long-press reaches the copy menu.
-          keyboardShouldPersistTaps="always"
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          {content}
-        </ScrollView>
-      )}
+      <ScrollView
+        horizontal
+        // As in the thread feed: with the keyboard open, the first long-press reaches the copy menu.
+        keyboardShouldPersistTaps="always"
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        {content}
+      </ScrollView>
     </CodeBlockFrame>
   );
 }

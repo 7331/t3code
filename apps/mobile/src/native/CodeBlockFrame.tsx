@@ -50,12 +50,11 @@ export function CodeBlockFrame(props: {
   );
 }
 
-/** A header icon; `active` draws it at full strength, as the native wrap toggle when on. */
+/** A header icon, drawn like the native block's copy button. */
 export function CodeBlockHeaderButton(props: {
   readonly icon: AppSymbolName;
   readonly label: string;
   readonly textStyle: NativeMarkdownTextStyle;
-  readonly active?: boolean;
   readonly onPress: () => void;
 }) {
   return (
@@ -68,11 +67,7 @@ export function CodeBlockHeaderButton(props: {
       <SymbolView
         name={props.icon}
         size={14}
-        tintColor={
-          props.active
-            ? props.textStyle.codeColor
-            : themeColorWithAlpha(props.textStyle.codeColor, 0.6)
-        }
+        tintColor={themeColorWithAlpha(props.textStyle.codeColor, 0.6)}
         type="monochrome"
       />
     </Pressable>

@@ -57,6 +57,7 @@ import { WorkspaceListHeader } from "../layout/workspace/WorkspaceListHeader";
 import { WorkspaceSidebarColumn } from "../layout/workspace/WorkspaceSidebarColumn";
 import {
   ThreadListV2PendingRow,
+  ThreadListV2ProjectHeader,
   ThreadListV2Row,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
@@ -67,6 +68,7 @@ import { useThreadRowProviderInstanceResolver } from "./thread-provider-instance
 import type { ThreadPrPresentation } from "../../state/thread-pr-presentation";
 import { ThreadPrDemandProvider } from "../../state/thread-pr-demand";
 import {
+  groupThreadListV2ItemsByProject,
   isThreadListV2ListItem,
   threadListV2ListItemsAreEqual,
   THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
@@ -267,7 +269,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   const pendingOrder = usePendingThreadOrder();
   const {
     layout: threadListV2Layout,
-    items: threadListV2Items,
+    items: inboxListItems,
     contentOnlyThreadKeys,
     olderSettledShelf,
   } = useThreadListV2({
@@ -292,6 +294,20 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     settledShelfExpanded,
     selectedThreadKey: props.selectedThreadKey ?? null,
   });
+  // Threads group under their project, worktrees under their repository like the filter menu.
+  const threadListV2Items = useMemo(() => {
+    const groupKeyByProjectKey = new Map(
+      projectScopes.flatMap((scope) =>
+        scope.projectRefs.map(
+          (ref) => [scopedProjectKey(ref.environmentId, ref.projectId), scope.key] as const,
+        ),
+      ),
+    );
+    return groupThreadListV2ItemsByProject(inboxListItems, (thread) => {
+      const projectKey = scopedProjectKey(thread.environmentId, thread.projectId);
+      return groupKeyByProjectKey.get(projectKey) ?? projectKey;
+    });
+  }, [inboxListItems, projectScopes]);
   const listItems: readonly SidebarListItem[] =
     settledShelfExpanded && threadListV2Layout.hiddenSettledCount > 0
       ? [
@@ -410,7 +426,6 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
       }
       case "v2-thread": {
         const thread = item.item.thread;
-        const scopeKey = scopedProjectKey(thread.environmentId, thread.projectId);
         return (
           <ThreadListV2Row
             onNewThreadOnBranch={props.onNewThreadOnBranch}
@@ -423,7 +438,8 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             snoozePresetMinute={item.snoozePresetMinute ?? ""}
             snoozeWakeLabelText={item.snoozeWakeLabelText}
             timeLabel={item.timeLabel}
-            project={projectByKey.get(scopeKey) ?? null}
+            // The project header above the group carries the favicon.
+            project={null}
             providerInstance={resolveProviderInstance(thread)}
             providers={providersByEnvironmentId.get(thread.environmentId)}
             environmentLabel={
@@ -482,6 +498,18 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             onSwipeableClose={handleSwipeableClose}
             onSwipeableWillOpen={handleSwipeableWillOpen}
             simultaneousSwipeGesture={sidebarScrollGesture}
+          />
+        );
+      }
+      case "v2-project": {
+        const projectKey = scopedProjectKey(item.environmentId, item.projectId);
+        const project = projectByKey.get(projectKey) ?? null;
+        return (
+          <ThreadListV2ProjectHeader
+            pane="sidebar"
+            environmentId={item.environmentId}
+            project={project}
+            title={projectTitleByProjectKey.get(projectKey) ?? project?.title ?? "No project"}
           />
         );
       }

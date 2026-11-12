@@ -64,6 +64,7 @@ import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
   ThreadListV2PendingRow,
+  ThreadListV2ProjectHeader,
   ThreadListV2Row,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
@@ -74,6 +75,7 @@ import { useThreadRowProviderInstanceResolver } from "../threads/thread-provider
 import { useOpenThreadPullRequests } from "../threads/use-open-thread-pull-requests";
 import type { ThreadPrPresentation } from "../../state/thread-pr-presentation";
 import {
+  groupThreadListV2ItemsByProject,
   threadListV2ListItemsAreEqual,
   THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
   THREAD_LIST_V2_SETTLED_PAGE_COUNT,
@@ -461,7 +463,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const pendingOrder = usePendingThreadOrder();
   const {
     layout: threadListV2Layout,
-    items: threadListV2Items,
+    items: inboxListItems,
     contentOnlyThreadKeys,
     olderSettledShelf,
   } = useThreadListV2({
@@ -486,6 +488,20 @@ export function HomeScreen(props: HomeScreenProps) {
     settledShelfExpanded,
     selectedThreadKey,
   });
+  // Threads group under their project, worktrees under their repository like the filter menu.
+  const threadListV2Items = useMemo(() => {
+    const groupKeyByProjectKey = new Map(
+      projectScopes.flatMap((scope) =>
+        scope.projectRefs.map(
+          (ref) => [scopedProjectKey(ref.environmentId, ref.projectId), scope.key] as const,
+        ),
+      ),
+    );
+    return groupThreadListV2ItemsByProject(inboxListItems, (thread) => {
+      const projectKey = scopedProjectKey(thread.environmentId, thread.projectId);
+      return groupKeyByProjectKey.get(projectKey) ?? projectKey;
+    });
+  }, [inboxListItems, projectScopes]);
   // Called as `props.onSelectThread(...)`, the compiler would cache this handler on the whole
   // props object, which is new on every render of Home's parent.
   const { onSelectThread } = props;
@@ -544,6 +560,18 @@ export function HomeScreen(props: HomeScreenProps) {
         />
       );
     }
+    if (item.type === "v2-project") {
+      const projectKey = scopedProjectKey(item.environmentId, item.projectId);
+      const project = projectByKey.get(projectKey) ?? null;
+      return (
+        <ThreadListV2ProjectHeader
+          pane={sidebarSurface ? "sidebar" : "screen"}
+          environmentId={item.environmentId}
+          project={project}
+          title={v2ProjectTitleByProjectKey.get(projectKey) ?? project?.title ?? "No project"}
+        />
+      );
+    }
     if (item.type === "v2-working-shelf") {
       return (
         <ThreadListV2WorkingShelfHeader
@@ -591,7 +619,8 @@ export function HomeScreen(props: HomeScreenProps) {
         snoozeWakeLabelText={item.snoozeWakeLabelText}
         timeLabel={item.timeLabel}
         showTrailingDivider={item.showTrailingDivider}
-        project={projectByKey.get(scopedProjectKey(thread.environmentId, thread.projectId)) ?? null}
+        // The project header above the group carries the favicon.
+        project={null}
         providerInstance={resolveProviderInstance(thread)}
         providers={providersByEnvironmentId.get(thread.environmentId)}
         environmentLabel={

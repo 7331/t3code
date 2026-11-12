@@ -31,6 +31,7 @@ import { useEnrichedLinkVariants } from "./useEnrichedLinkVariants";
 import { useRetryingImageSource } from "./useRetryingImageSource";
 import * as Dialog from "../components/ui/Dialog";
 import { copyTextWithHaptic } from "../lib/copyTextWithHaptic";
+import { themeColorWithAlpha } from "../lib/mobileTheme";
 import type { HighlightScheme } from "../lib/highlights";
 import {
   ENRICHED_INLINE_FILE_LINK_REGEX,
@@ -46,6 +47,8 @@ function enrichedStyle(
   fontScale: number,
 ): MarkdownStyle {
   const monospace = Platform.OS === "ios" ? "Menlo" : "monospace";
+  // Portal draws comments in its tertiary text: the code colour, dimmed.
+  const tertiaryCodeColor = themeColorWithAlpha(style.codeColor, 0.55);
   // Keep the radius modest: iOS clips square table-cell borders without stroking the corner arcs.
   const block = {
     marginTop: 4,
@@ -107,30 +110,31 @@ function enrichedStyle(
       fontSize: style.fontSize * 0.9,
       ...block,
       padding: 12,
+      // Portal's code palette (desktop design tokens `--code-syntax-*`), per theme.
       syntaxColors: dark
         ? {
-            keyword: "#ff7b72",
-            string: "#a5d6ff",
-            number: "#79c0ff",
-            constant: "#79c0ff",
-            comment: "#8b949e",
-            function: "#d2a8ff",
-            type: "#ffa657",
-            property: "#79c0ff",
-            tag: "#7ee787",
-            attribute: "#79c0ff",
+            keyword: "#cd97ed",
+            string: "#75c7a1",
+            number: "#efa96c",
+            constant: "#efa96c",
+            comment: tertiaryCodeColor,
+            function: "#88b9f2",
+            type: "#88b9f2",
+            property: "#eac886",
+            tag: "#cd97ed",
+            attribute: "#eac886",
           }
         : {
-            keyword: "#cf222e",
-            string: "#0a3069",
-            number: "#0550ae",
-            constant: "#0550ae",
-            comment: "#6e7781",
-            function: "#8250df",
-            type: "#953800",
-            property: "#0550ae",
-            tag: "#116329",
-            attribute: "#0550ae",
+            keyword: "#7b30a6",
+            string: "#196b45",
+            number: "#a0480d",
+            constant: "#a0480d",
+            comment: tertiaryCodeColor,
+            function: "#185caa",
+            type: "#185caa",
+            property: "#895506",
+            tag: "#7b30a6",
+            attribute: "#895506",
           },
     },
     blockquote: {
@@ -431,7 +435,8 @@ export function MobileEnrichedMarkdownText(props: SelectableMarkdownTextProps) {
           }}
           enableTaskListItemToggle={props.onTaskListItemPress !== undefined}
           onTaskListItemPress={props.onTaskListItemPress}
-          enableCodeBlockWrapToggle
+          // Portal's code blocks carry one action, copy.
+          enableCodeBlockWrapToggle={false}
           spoilerOverlay="solid"
           onLinkPress={
             props.onLinkPress || props.onImagePress ? ({ url }) => onLinkPress(url) : undefined

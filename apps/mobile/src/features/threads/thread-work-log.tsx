@@ -66,6 +66,7 @@ import { AppText as Text } from "../../components/ui/AppText";
 import { T3Wordmark } from "../../components/T3Wordmark";
 import { BrowserAppIcon } from "./BrowserAppIcon";
 import { useAppActive, useReduceMotionEnabled } from "../../lib/appState";
+import { PortalTypingDots } from "../portal/PortalTypingDots";
 import { cn } from "../../lib/cn";
 import { THREAD_WORK_ROW_MIN_HEIGHT, type deriveThreadWorkLogSizing } from "../../lib/layout";
 import {
@@ -1427,12 +1428,11 @@ export function ThreadThinkingRow(props: {
       className="-mx-1 min-h-8 flex-row items-center px-1.5 py-0"
       style={{ minHeight: props.rowSizing.estimatedRowHeight }}
     >
-      <ShimmeringWorkContent
-        icon="brain"
-        iconSubtleColor={props.iconSubtleColor}
-        label={label}
-        showIcon
-      />
+      <WorkLogIconSlot>
+        <PortalTypingDots />
+      </WorkLogIconSlot>
+      <View className="w-1.5" />
+      <WorkLogLabel>{label}</WorkLogLabel>
     </View>
   );
 }

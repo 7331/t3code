@@ -101,6 +101,30 @@ export function ProviderIcon(props: ProviderIconProps) {
 
   const packageIcon =
     props.provider === "openrouter" ? openRouterIcon : getProviderClient(props.provider)?.icon;
+  // pi's block mark reads as a broken glyph when bare at control size; on its own tile it reads
+  // as the app mark it is.
+  if (packageIcon && props.provider === "pi") {
+    const tileColor = isDarkMode ? packageIcon.fill.dark : packageIcon.fill.light;
+    const markColor = isDarkMode ? packageIcon.fill.light : packageIcon.fill.dark;
+    const markSize = Math.round(size * 0.6);
+    return (
+      <View
+        className="items-center justify-center"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: Math.round(size * 0.26),
+          backgroundColor: tileColor,
+        }}
+      >
+        <Svg width={markSize} height={markSize} viewBox={packageIcon.viewBox} fill="none">
+          {packageIcon.paths.map((path) => (
+            <Path key={path.d} d={path.d} fillRule={path.fillRule} fill={markColor} />
+          ))}
+        </Svg>
+      </View>
+    );
+  }
   if (packageIcon) {
     const themeFill = (fill: { readonly light: string; readonly dark: string }) =>
       isDarkMode ? fill.dark : fill.light;

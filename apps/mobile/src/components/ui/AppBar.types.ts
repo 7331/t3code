@@ -42,6 +42,8 @@ export type AppBarMenuItem =
 
 export interface AppBarMenu {
   readonly title: string;
+  /** The header button's label when the title names the sheet, not the button. Defaults to the title. */
+  readonly accessibilityLabel?: string;
   readonly icon: AppSymbolName;
   readonly status?: string;
   readonly separateBackground?: boolean;

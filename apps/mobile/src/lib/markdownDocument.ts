@@ -3,7 +3,11 @@ import { unified, type Processor } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import { remarkKeepWindowsProsePaths } from "@t3tools/shared/markdownWindowsPaths";
-import { absoluteFilePathMatches, parseMarkdownFileLink } from "@t3tools/shared/markdownLinks";
+import {
+  absoluteFilePathMatches,
+  inlineCodeFilePathCandidate,
+  parseMarkdownFileLink,
+} from "@t3tools/shared/markdownLinks";
 import { isWindowsAbsolutePath } from "@t3tools/shared/path";
 
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkKeepWindowsProsePaths);
@@ -286,6 +290,15 @@ export function markdownWithHtml(markdown: string): string {
 // Start only at the beginning of a backtick run to avoid retrying every suffix.
 const INLINE_CODE_SPAN = /(?<!`)`+([^`\r\n]+)`+/g;
 
+// A bare `name.ext:line` has the shape of `host:port`; the shared rules tell them apart.
+function namesInlineFile(code: string, fileLink: RegExp): boolean {
+  const trimmed = code.trim();
+  return (
+    fileLink.test(trimmed) &&
+    (/[\\/]/.test(trimmed) || inlineCodeFilePathCandidate(trimmed) !== null)
+  );
+}
+
 export function markdownWithInlineFileLinks(markdown: string, fileLink: RegExp): string {
   return transformNativeMarkdown(markdown, fileLink, false);
 }
@@ -299,7 +312,7 @@ function transformNativeMarkdown(
   let linkFiles = false;
   if (fileLink) {
     for (const [, code] of markdown.matchAll(INLINE_CODE_SPAN)) {
-      if (fileLink.test(code!.trim())) {
+      if (namesInlineFile(code!, fileLink)) {
         linkFiles = true;
         break;
       }
@@ -318,7 +331,8 @@ function transformNativeMarkdown(
       if (
         start !== undefined &&
         end !== undefined &&
-        fileLink?.test(node.value) &&
+        fileLink !== undefined &&
+        namesInlineFile(node.value, fileLink) &&
         parseMarkdownFileLink(node.value) !== null &&
         !/[<>]/.test(node.value)
       ) {
