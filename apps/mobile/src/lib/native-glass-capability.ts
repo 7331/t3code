@@ -1,6 +1,8 @@
 export function supportsNativeLiquidGlass(
-  platform: string,
-  nativeCapabilityAvailable: boolean,
+  _platform: string,
+  _nativeCapabilityAvailable: boolean,
 ): boolean {
-  return platform === "ios" && nativeCapabilityAvailable;
+  // The fork keeps liquid glass off: solid headers and plain buttons instead of
+  // glass pills and hairline capsules.
+  return false;
 }

@@ -28,6 +28,8 @@ import { useDeviceType } from "../../../native/native-layout-metrics";
 import { WorkspaceSidebarTabs } from "./WorkspaceSidebarTabs";
 import { useAdaptiveWorkspaceLayout, useWorkspacePaneState } from "../AdaptiveWorkspaceLayout";
 import { useSelectWorkspaceTab } from "./useSelectWorkspaceTab";
+import { PortalWorkspaceDrawer } from "../../portal/shell/PortalWorkspaceDrawer";
+import { usePortalPhoneShell } from "../../portal/shell/usePortalPhoneShell";
 
 const PULL_REQUEST_ICON = require("../../../../assets/icons/pull-request.png");
 
@@ -85,6 +87,9 @@ export function WorkspaceNativeTabs(props: {
   const systemTabBar = useSystemWorkspaceTabBar();
   const deviceType = useDeviceType();
   const compactTabs = useCompactWorkspaceTabs();
+  // The Portal shell owns phone navigation: the glass tab footer leaves, the sidebar drawer
+  // slides over every tab slot instead.
+  const portalShell = usePortalPhoneShell();
   const { layout } = useAdaptiveWorkspaceLayout();
   const { panes } = useWorkspacePaneState();
   // The tabs belong to the sidebar; over a page with the sidebar hidden they'd cover the composer.
@@ -158,8 +163,9 @@ export function WorkspaceNativeTabs(props: {
           );
         })}
       </Tabs.Host>
+      <PortalWorkspaceDrawer />
       {(deviceType === "pad" ||
-        compactTabs ||
+        (compactTabs && !portalShell) ||
         (layout.variant === "medium" &&
           !workspaceUsesColumns(selectedTab, workspace.settingsOpen))) &&
       !props.hidden &&
