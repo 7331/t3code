@@ -457,7 +457,7 @@ function ProjectScriptEditorForm({
                             className={`relative flex flex-col items-center gap-2 rounded-md border px-2 py-2 text-xs dark:border-transparent ${
                               isSelected
                                 ? "border-primary/70 bg-primary/10 ring-inset dark:ring-1 dark:ring-primary/30"
-                                : "border-border/70 hover:bg-accent/60 dark:bg-white/[0.035]"
+                                : "border-border/70 hover:bg-accent/60 dark:bg-muted"
                             }`}
                             onClick={() => {
                               setIcon(entry.id);
@@ -526,7 +526,7 @@ function ProjectScriptEditorForm({
                 <T>Open this URL in the in-app preview when this action runs.</T>
               </p>
             </div>
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
+            <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-muted">
               <span>
                 <T>Run automatically on worktree creation</T>
               </span>
@@ -536,7 +536,7 @@ function ProjectScriptEditorForm({
               />
             </label>
             <label
-              className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035] ${
+              className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-muted ${
                 runOnWorktreeCreate ? "" : "opacity-60"
               }`}
             >
@@ -549,7 +549,7 @@ function ProjectScriptEditorForm({
                 onCheckedChange={(checked) => setWaitForSetup(Boolean(checked))}
               />
             </label>
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
+            <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-muted">
               <span>
                 <T>Run in the thread's worktree when the thread settles</T>
               </span>
@@ -558,7 +558,7 @@ function ProjectScriptEditorForm({
                 onCheckedChange={(checked) => setRunOnSettle(Boolean(checked))}
               />
             </label>
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
+            <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-muted">
               <span>
                 <T>Stop this action when the thread settles</T>
               </span>
@@ -568,7 +568,7 @@ function ProjectScriptEditorForm({
               />
             </label>
             <label
-              className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035] ${
+              className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-muted ${
                 previewUrl.trim().length === 0 ? "opacity-60" : ""
               }`}
             >
