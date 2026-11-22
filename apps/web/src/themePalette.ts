@@ -84,15 +84,20 @@ type CustomThemeLibrarySnapshot =
   | Readonly<{ status: "unavailable"; reason: "storage-unavailable"; cause: unknown }>;
 
 let customThemeLibrarySnapshot: CustomThemeLibrarySnapshot | null = null;
+type ThemePreview = Readonly<{ colors: ThemeColors; appearance: ThemeAppearance }>;
 const themePreviewListeners = new Set<() => void>();
-let themePreviewAppearance: ThemeAppearance | null = null;
+let themePreview: ThemePreview | null = null;
+
+export function getThemePreview(): ThemePreview | null {
+  return themePreview;
+}
 
 export function getThemePreviewAppearance(): ThemeAppearance | null {
-  return themePreviewAppearance;
+  return themePreview?.appearance ?? null;
 }
 
 export function getThemePreviewSidebarArtwork(): boolean | null {
-  return themePreviewAppearance === null ? null : false;
+  return themePreview === null ? null : false;
 }
 
 export function subscribeToThemePreview(listener: () => void): () => void {
@@ -100,9 +105,9 @@ export function subscribeToThemePreview(listener: () => void): () => void {
   return () => themePreviewListeners.delete(listener);
 }
 
-function setThemePreviewAppearance(appearance: ThemeAppearance | null): void {
-  if (themePreviewAppearance === appearance) return;
-  themePreviewAppearance = appearance;
+function setThemePreview(preview: ThemePreview | null): void {
+  if (themePreview === preview) return;
+  themePreview = preview;
   for (const listener of themePreviewListeners) listener();
 }
 
@@ -1737,7 +1742,7 @@ export function applyThemeColorPreview(
   }
   applyContextChipVariables(root, colors);
   applyThemeCss(css);
-  setThemePreviewAppearance(appearance);
+  setThemePreview({ colors, appearance });
 }
 
 export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppearance): void {
@@ -1746,7 +1751,7 @@ export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppe
   const root = document.documentElement;
   if (!root?.style) return;
 
-  setThemePreviewAppearance(null);
+  setThemePreview(null);
   const palette = getThemeDefinition(theme);
   applyThemeCss(palette?.css);
   applyThemeBackground(palette?.id);
