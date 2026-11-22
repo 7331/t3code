@@ -81,6 +81,7 @@ import React, {
   type ClipboardEvent as ReactClipboardEvent,
   use,
   memo,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -1803,6 +1804,9 @@ const CHAT_MARKDOWN_COMPONENTS = {
   },
   pre: function MarkdownPre({ node, children, ...props }) {
     const gt = useGT();
+    // Renderers are reused when text changes, so a pick only holds for the code it was made on.
+    const [picked, setPicked] = useState<{ language: string; code: string } | null>(null);
+    const deferredPicked = useDeferredValue(picked);
     const { resolvedTheme, diffThemeName, expandMedia, isStreaming, onRunShellCommand } = use(
       ChatMarkdownRendererContext,
     );
@@ -1814,9 +1818,12 @@ const CHAT_MARKDOWN_COMPONENTS = {
 
     const language = extractFenceLanguage(codeBlock.className);
     const fenceTitle = extractFenceTitle(extractPreCodeMeta(node));
+    const displayLanguage = picked?.code === codeBlock.code ? picked.language : language;
+    const highlightLanguage =
+      deferredPicked?.code === codeBlock.code ? deferredPicked.language : language;
     const highlightedCode = (
       <RenderErrorBoundary
-        resetKeys={[codeBlock.code, language, diffThemeName, isStreaming]}
+        resetKeys={[codeBlock.code, highlightLanguage, diffThemeName, isStreaming]}
         fallback={<pre {...props}>{children}</pre>}
       >
         <Suspense
@@ -1827,7 +1834,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
           }
         >
           <SuspenseShikiCodeBlock
-            className={codeBlock.className}
+            language={highlightLanguage}
             code={codeBlock.code}
             themeName={diffThemeName}
             isStreaming={isStreaming}
@@ -1856,12 +1863,18 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return (
       <MarkdownCodeBlock
         code={codeBlock.code}
-        language={language}
+        language={displayLanguage}
         fenceTitle={fenceTitle}
         theme={resolvedTheme}
         onRunShellCommand={
           onRunShellCommand && !isStreaming && isClosedCodeFence(node, text, codeBlock.code)
             ? onRunShellCommand
+            : undefined
+        }
+        // Only replies that can run commands offer the picker; elsewhere a retag gains nothing.
+        onLanguageChange={
+          onRunShellCommand
+            ? (next) => setPicked({ language: next, code: codeBlock.code })
             : undefined
         }
         isStreaming={isStreaming}

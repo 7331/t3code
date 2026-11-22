@@ -19,12 +19,9 @@ import {
 } from "../../pierre-icons";
 import { Button } from "../ui/button";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
+import { ComposerCodeBlockLanguagePicker } from "./ComposerCodeBlockLanguagePicker";
 import { HighlightedCodeLines } from "./HighlightedCodeLines";
-import {
-  createHighlightCacheKey,
-  estimateHighlightedSize,
-  extractFenceLanguage,
-} from "./MarkdownCodeBlock.logic";
+import { createHighlightCacheKey, estimateHighlightedSize } from "./MarkdownCodeBlock.logic";
 import { reportMarkdownActionFailure } from "./markdownActionFailure";
 import { PierreEntryIcon } from "./PierreEntryIcon";
 
@@ -135,6 +132,7 @@ export function MarkdownCodeBlock({
   fenceTitle,
   theme,
   onRunShellCommand,
+  onLanguageChange,
   isStreaming,
   viewToggle,
   canWrap = true,
@@ -146,6 +144,7 @@ export function MarkdownCodeBlock({
   fenceTitle: string | null;
   theme: "light" | "dark";
   onRunShellCommand?: ((command: string) => void) | undefined;
+  onLanguageChange?: ((language: string) => void) | undefined;
   isStreaming: boolean;
   viewToggle?: ReactNode;
   canWrap?: boolean;
@@ -220,6 +219,19 @@ export function MarkdownCodeBlock({
       theme={theme}
       wrapped={wrapped}
       headerProps={THREAD_FIND_IGNORE_PROPS}
+      title={
+        onLanguageChange ? (
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <ComposerCodeBlockLanguagePicker
+              language={language}
+              theme={theme}
+              disabled={isStreaming}
+              onChange={(next) => onLanguageChange(next || "text")}
+            />
+            {fenceTitle ? <span className="truncate font-mono text-2xs">{fenceTitle}</span> : null}
+          </span>
+        ) : undefined
+      }
       actions={
         <span
           className="flex items-center gap-0.5"
@@ -270,21 +282,20 @@ export function MarkdownCodeBlock({
 }
 
 interface SuspenseShikiCodeBlockProps {
-  className: string | undefined;
+  language: string;
   code: string;
   themeName: DiffThemeName;
   isStreaming: boolean;
 }
 
 export function SuspenseShikiCodeBlock({
-  className,
+  language,
   code,
   themeName,
   isStreaming,
 }: SuspenseShikiCodeBlockProps) {
   const [hasStreamed, setHasStreamed] = useState(isStreaming);
   if (isStreaming && !hasStreamed) setHasStreamed(true);
-  const language = extractFenceLanguage(className);
   const cacheKey = createHighlightCacheKey(code, language, themeName);
   // Once lines are mounted individually, keep that renderer when streaming
   // finishes so switching to cached HTML cannot clear an existing selection.
